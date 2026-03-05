@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clientes Embaixadores — Saint Germain</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<div id="root"></div>
+
+<script type="text/babel">
+
+// ─────────────────────────────────────────
+// CONFIGURAÇÃO — substitua pelos seus valores
+// ─────────────────────────────────────────
+const CONFIG = {
+SUPABASE_URL_AQUI       → https://fsfqnshkfwnfeswwdmxg.supabase.co,
+SUPABASE_ANON_KEY_AQUI  → sb_secret_shWt05xFU7qhIQWfOcEvLQ_KQplw4Au,
+NUVEMSHOP_USER_ID_AQUI  → 1116055,
+NUVEMSHOP_TOKEN_AQUI    → 803dbce287de76eb31d88c26c30e60c72126bb22,
+  COMISSAO_PCT: 0.15,
+  JANELA_DEVOLUCAO_DIAS: 7,
+};
+
+// ─────────────────────────────────────────
+// SUPABASE CLIENT
+// ─────────────────────────────────────────
+const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
+// ─────────────────────────────────────────
+// NUVEMSHOP API (via proxy ou direto se CORS permitir)
+// ─────────────────────────────────────────
+const nuvemshop = {
+  baseUrl: `https://api.nuvemshop.com.br/v1/${CONFIG.NUVEMSHOP_USER_ID}`,
+  headers: {
+    "Authentication": `bearer ${CONFIG.NUVEMSHOP_TOKEN}`,
+    "Content-Type": "application/json",
+    "User-Agent": "SaintGermain-Embaixadores/1.0",
+  },
+
+  async getOrdersByEmail(email) {
+    const res = await fetch(`${this.baseUrl}/orders?q=${encodeURIComponent(email)}&fields=id,total,coupon,created_at,payment_status`, { headers: this.headers });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async getOrdersByCoupon(couponCode) {
+    const res = await fetch(`${this.baseUrl}/orders?coupon=${encodeURIComponent(couponCode)}&fields=id,total,coupon,created_at,payment_status`, { headers: this.headers });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async createCoupon(code, email) {
+    const body = {
+      code,
+      type: "percentage",
+      value: CONFIG.COMISSAO_PCT * 100,
+      valid: true,
+      max_uses: null,
+      start_date: new Date().toISOString().split("T")[0],
+      categories: [],
+      min_price: "0.00",
+      includes_shipping: false,
+    };
+    const res = await fetch(`${this.baseUrl}/coupons`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  },
+};
+
+// ─────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────
+function gerarCupom(nome) {
+  const base = nome.trim().toUpperCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 10);
+  return `SG${base}`;
+}
+
+function formatBRL(val) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+}
+
+function formatDate(str) {
+  return new Date(str).toLocaleDateString("pt-BR");
+}
+
+function diaPassou(dateStr, dias) {
+  const diff = (Date.now() - new Date(dateStr).getTime()) / 86400000;
+  return diff >= dias;
+}
+
+// ─────────────────────────────────────────
+// COMPONENTS
+// ─────────────────────────────────────────
+
+function Logo({ size = "md" }) {
+  const sizes = { sm: "text-lg", md: "text-2xl", lg: "text-4xl" };
+  return (
+    <div className={`font-bold tracking-widest ${sizes[size]} text-gray-900 uppercase`}>
+      Saint Germain
+      <span className="block text-xs font-normal tracking-wider text-gray-400 mt-0.5">
+        Clientes Embaixadores
+      </span>
+    </div>
+  );
+}
+
+function Card({ children, className = "" }) {
+  return (
+    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function Button({ children, onClick, loading, variant = "primary", className = "", disabled }) {
+  const base = "px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 flex items-center justify-center gap-2";
+  const variants = {
+    primary: "bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50",
+    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
+    ghost: "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
+    danger: "bg-red-50 text-red-600 hover:bg-red-100",
+  };
+  return (
+    <button onClick={onClick} disabled={disabled || loading} className={`${base} ${variants[variant]} ${className}`}>
+      {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : children}
+    </button>
+  );
+}
+
+function Input({ label, ...props }) {
+  return (
+    <div>
+      {label && <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>}
+      <input
+        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
+        {...props}
+      />
+    </div>
+  );
+}
+
+function Badge({ children, color = "gray" }) {
+  const colors = {
+    gray: "bg-gray-100 text-gray-600",
+    green: "bg-green-100 text-green-700",
+    yellow: "bg-yellow-100 text-yellow-700",
+    blue: "bg-blue-100 text-blue-700",
+    red: "bg-red-100 text-red-600",
+  };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[color]}`}>
+      {children}
+    </span>
+  );
+}
+
+function Alert({ message, type = "error" }) {
+  if (!message) return null;
+  const styles = {
+    error: "bg-red-50 text-red-700 border-red-200",
+    success: "bg-green-50 text-green-700 border-green-200",
+    info: "bg-blue-50 text-blue-700 border-blue-200",
+  };
+  return (
+    <div className={`rounded-xl border px-4 py-3 text-sm ${styles[type]}`}>
+      {message}
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub }) {
+  return (
+    <div className="bg-gray-50 rounded-xl p-4">
+      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-2xl font-bold text-gray-900">{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
+// PAGES
+// ─────────────────────────────────────────
+
+// ── CADASTRO
+function PageCadastro({ onNavigate }) {
+  const [form, setForm] = React.useState({ nome: "", email: "", cpf: "", whatsapp: "", instagram: "" });
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [success, setSuccess] = React.useState(false);
+  const [cupomGerado, setCupomGerado] = React.useState("");
+  const [aceitou, setAceitou] = React.useState(false);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  async function handleSubmit() {
+    setError("");
+    if (!form.nome || !form.email || !form.cpf || !form.whatsapp) {
+      setError("Preencha todos os campos obrigatórios."); return;
+    }
+    if (!aceitou) { setError("Aceite os termos para continuar."); return; }
+
+    setLoading(true);
+    try {
+      // Verifica se já existe
+      const { data: existe } = await supabase
+        .from("embaixadores")
+        .select("id")
+        .eq("email", form.email)
+        .single();
+      if (existe) { setError("Este e-mail já está cadastrado no programa."); setLoading(false); return; }
+
+      // Verifica elegibilidade na Nuvemshop
+      const pedidos = await nuvemshop.getOrdersByEmail(form.email);
+      if (!pedidos || pedidos.length === 0) {
+        setError("Não encontramos compras na Saint Germain associadas a este e-mail. Você precisa ter feito pelo menos uma compra para participar.");
+        setLoading(false); return;
+      }
+
+      // Gera cupom
+      const cupom = gerarCupom(form.nome);
+
+      // Cria cupom na Nuvemshop
+      const cupomCriado = await nuvemshop.createCoupon(cupom, form.email);
+      if (!cupomCriado) {
+        setError("Erro ao criar cupom. Tente novamente."); setLoading(false); return;
+      }
+
+      // Salva embaixador no Supabase
+      const { error: dbErr } = await supabase.from("embaixadores").insert({
+        nome: form.nome,
+        email: form.email,
+        cpf: form.cpf,
+        whatsapp: form.whatsapp,
+        instagram: form.instagram,
+        cupom,
+        status: "ativo",
+        nivel: "embaixador",
+        comissao_pct: CONFIG.COMISSAO_PCT,
+        aceite_termos_em: new Date().toISOString(),
+        criado_em: new Date().toISOString(),
+      });
+
+      if (dbErr) { setError("Erro ao salvar cadastro. Tente novamente."); setLoading(false); return; }
+
+      setCupomGerado(cupom);
+      setSuccess(true);
+    } catch (e) {
+      setError("Erro inesperado. Tente novamente.");
+    }
+    setLoading(false);
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-md fade-in text-center">
+          <div className="text-5xl mb-4">🖤</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Bem-vindo(a) ao time!</h2>
+          <p className="text-gray-500 mb-6">Você agora é um Embaixador Saint Germain.</p>
+          <Card className="mb-4">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Seu cupom exclusivo</p>
+            <div className="bg-gray-900 text-white rounded-xl py-4 px-6 text-2xl font-bold tracking-widest mb-2">
+              {cupomGerado}
+            </div>
+            <p className="text-xs text-gray-400">
+              {(CONFIG.COMISSAO_PCT * 100).toFixed(0)}% de desconto para quem usar · {(CONFIG.COMISSAO_PCT * 100).toFixed(0)}% de comissão para você
+            </p>
+          </Card>
+          <p className="text-sm text-gray-500 mb-6">Em breve você receberá uma mensagem com todos os detalhes do programa.</p>
+          <Button onClick={() => onNavigate("login")}>Acessar meu painel</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+      <div className="w-full max-w-md fade-in">
+        <div className="text-center mb-8">
+          <Logo size="lg" />
+          <p className="text-gray-500 mt-3 text-sm">Um convite para quem já faz parte da nossa história.</p>
+        </div>
+
+        <Card>
+          <h2 className="font-semibold text-gray-900 mb-1">Cadastre-se no programa</h2>
+          <p className="text-sm text-gray-400 mb-6">Apenas para clientes com histórico de compra.</p>
+
+          <div className="space-y-4">
+            <Input label="Nome completo *" value={form.nome} onChange={e => set("nome", e.target.value)} placeholder="Seu nome" />
+            <Input label="E-mail *" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="O mesmo usado na loja" />
+            <Input label="CPF *" value={form.cpf} onChange={e => set("cpf", e.target.value)} placeholder="000.000.000-00" />
+            <Input label="WhatsApp *" value={form.whatsapp} onChange={e => set("whatsapp", e.target.value)} placeholder="(11) 99999-9999" />
+            <Input label="Instagram (opcional)" value={form.instagram} onChange={e => set("instagram", e.target.value)} placeholder="@seuinstagram" />
+
+            <div className="flex items-start gap-3 pt-1">
+              <input type="checkbox" id="termos" checked={aceitou} onChange={e => setAceitou(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-gray-900 cursor-pointer" />
+              <label htmlFor="termos" className="text-xs text-gray-500 cursor-pointer">
+                Aceito os termos de uso do programa e autorizo o uso da minha imagem em publicações da Saint Germain relacionadas ao programa Clientes Embaixadores.
+              </label>
+            </div>
+
+            <Alert message={error} type="error" />
+
+            <Button onClick={handleSubmit} loading={loading} className="w-full">
+              Quero fazer parte
+            </Button>
+          </div>
+        </Card>
+
+        <p className="text-center text-xs text-gray-400 mt-4">
+          Já é embaixador?{" "}
+          <button onClick={() => onNavigate("login")} className="text-gray-700 font-medium hover:underline">
+            Acesse seu painel
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── LOGIN
+function PageLogin({ onLogin, onNavigate }) {
+  const [email, setEmail] = React.useState("");
+  const [senha, setSenha] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  async function handleLogin() {
+    setError(""); setLoading(true);
+    const { data, error: err } = await supabase.auth.signInWithPassword({ email, password: senha });
+    if (err) { setError("E-mail ou senha incorretos."); setLoading(false); return; }
+    onLogin(data.user);
+    setLoading(false);
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+      <div className="w-full max-w-sm fade-in">
+        <div className="text-center mb-8">
+          <Logo size="lg" />
+        </div>
+        <Card>
+          <h2 className="font-semibold text-gray-900 mb-5">Entrar no painel</h2>
+          <div className="space-y-4">
+            <Input label="E-mail" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" />
+            <Input label="Senha" type="password" value={senha} onChange={e => setSenha(e.target.value)} placeholder="••••••••"
+              onKeyDown={e => e.key === "Enter" && handleLogin()} />
+            <Alert message={error} />
+            <Button onClick={handleLogin} loading={loading} className="w-full">Entrar</Button>
+          </div>
+        </Card>
+        <p className="text-center text-xs text-gray-400 mt-4">
+          Ainda não é embaixador?{" "}
+          <button onClick={() => onNavigate("cadastro")} className="text-gray-700 font-medium hover:underline">
+            Cadastre-se
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── PAINEL DO EMBAIXADOR
+function PagePainel({ user, onLogout }) {
+  const [embaixador, setEmbaixador] = React.useState(null);
+  const [comissoes, setComissoes] = React.useState([]);
+  const [resgates, setResgates] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [tab, setTab] = React.useState("inicio");
+  const [resgatando, setResgatando] = React.useState(false);
+  const [formResgate, setFormResgate] = React.useState({ tipo: "credito", pix_key: "" });
+  const [msgResgate, setMsgResgate] = React.useState("");
+  const [sincronizando, setSincronizando] = React.useState(false);
+
+  React.useEffect(() => { carregarDados(); }, []);
+
+  async function carregarDados() {
+    setLoading(true);
+    const { data: emb } = await supabase.from("embaixadores").select("*").eq("email", user.email).single();
+    if (!emb) { setLoading(false); return; }
+    setEmbaixador(emb);
+
+    const { data: comms } = await supabase.from("comissoes").select("*").eq("embaixador_id", emb.id).order("criado_em", { ascending: false });
+    setComissoes(comms || []);
+
+    const { data: ress } = await supabase.from("resgates").select("*").eq("embaixador_id", emb.id).order("criado_em", { ascending: false });
+    setResgates(ress || []);
+    setLoading(false);
+  }
+
+  async function sincronizarVendas() {
+    if (!embaixador) return;
+    setSincronizando(true);
+    try {
+      const pedidos = await nuvemshop.getOrdersByCoupon(embaixador.cupom);
+      let novos = 0;
+      for (const pedido of (pedidos || [])) {
+        const { data: existe } = await supabase.from("comissoes").select("id").eq("pedido_id", String(pedido.id)).single();
+        if (existe) continue;
+
+        const valorPedido = parseFloat(pedido.total);
+        const comissaoValor = valorPedido * CONFIG.COMISSAO_PCT;
+        const confirmado = pedido.payment_status === "paid" && diaPassou(pedido.created_at, CONFIG.JANELA_DEVOLUCAO_DIAS);
+
+        await supabase.from("comissoes").insert({
+          embaixador_id: embaixador.id,
+          pedido_id: String(pedido.id),
+          valor_pedido: valorPedido,
+          valor_comissao: comissaoValor,
+          status: confirmado ? "confirmada" : "pendente",
+          criado_em: pedido.created_at,
+        });
+        novos++;
+      }
+      await carregarDados();
+      if (novos === 0) alert("Nenhuma venda nova encontrada.");
+      else alert(`${novos} venda(s) sincronizada(s)!`);
+    } catch (e) {
+      alert("Erro ao sincronizar. Tente novamente.");
+    }
+    setSincronizando(false);
+  }
+
+  async function solicitarResgate() {
+    const saldo = comissoes.filter(c => c.status === "confirmada" && !c.resgatada).reduce((s, c) => s + c.valor_comissao, 0);
+    if (saldo <= 0) { setMsgResgate("Você não tem saldo disponível para resgate."); return; }
+    if (formResgate.tipo === "pix" && !formResgate.pix_key) { setMsgResgate("Informe a chave Pix."); return; }
+
+    setResgatando(true);
+    const { error } = await supabase.from("resgates").insert({
+      embaixador_id: embaixador.id,
+      valor: saldo,
+      tipo: formResgate.tipo,
+      pix_key: formResgate.tipo === "pix" ? formResgate.pix_key : null,
+      status: "solicitado",
+      criado_em: new Date().toISOString(),
+    });
+    if (!error) {
+      await supabase.from("comissoes").update({ resgatada: true }).eq("embaixador_id", embaixador.id).eq("status", "confirmada").is("resgatada", null);
+      setMsgResgate("Resgate solicitado com sucesso! O time entrará em contato em breve.");
+      await carregarDados();
+    } else {
+      setMsgResgate("Erro ao solicitar resgate. Tente novamente.");
+    }
+    setResgatando(false);
+  }
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (!embaixador) return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <Card className="text-center max-w-sm">
+        <p className="text-gray-500 mb-4">Cadastro não encontrado para este e-mail.</p>
+        <Button onClick={onLogout} variant="secondary">Voltar</Button>
+      </Card>
+    </div>
+  );
+
+  const totalVendas = comissoes.length;
+  const totalGerado = comissoes.reduce((s, c) => s + c.valor_pedido, 0);
+  const saldoConfirmado = comissoes.filter(c => c.status === "confirmada" && !c.resgatada).reduce((s, c) => s + c.valor_comissao, 0);
+  const saldoPendente = comissoes.filter(c => c.status === "pendente").reduce((s, c) => s + c.valor_comissao, 0);
+
+  const statusBadge = { confirmada: ["green", "Confirmada"], pendente: ["yellow", "Pendente"], paga: ["blue", "Paga"] };
+  const resgatesBadge = { solicitado: ["yellow", "Solicitado"], aprovado: ["green", "Aprovado"], pago: ["blue", "Pago"], recusado: ["red", "Recusado"] };
+
+  const tabs = [
+    { id: "inicio", label: "Início" },
+    { id: "vendas", label: `Vendas (${totalVendas})` },
+    { id: "resgatar", label: "Resgatar" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <Logo size="sm" />
+          <button onClick={onLogout} className="text-xs text-gray-400 hover:text-gray-700">Sair</button>
+        </div>
+      </header>
+
+      <div className="max-w-2xl mx-auto p-4 space-y-4 fade-in">
+
+        {/* Saudação */}
+        <div className="pt-2">
+          <h1 className="text-xl font-bold text-gray-900">Olá, {embaixador.nome.split(" ")[0]} 👋</h1>
+          <p className="text-sm text-gray-400">Embaixadora Saint Germain</p>
+        </div>
+
+        {/* Cupom */}
+        <Card>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Seu cupom exclusivo</p>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 bg-gray-900 text-white rounded-xl py-3 px-5 text-xl font-bold tracking-widest text-center">
+              {embaixador.cupom}
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() => { navigator.clipboard.writeText(embaixador.cupom); alert("Cupom copiado!"); }}
+            >
+              Copiar
+            </Button>
+          </div>
+          <p className="text-xs text-gray-400 mt-2 text-center">
+            {(CONFIG.COMISSAO_PCT * 100).toFixed(0)}% de desconto para quem usar · {(CONFIG.COMISSAO_PCT * 100).toFixed(0)}% de comissão para você
+          </p>
+        </Card>
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${tab === t.id ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* TAB: INÍCIO */}
+        {tab === "inicio" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Saldo disponível" value={formatBRL(saldoConfirmado)} sub="Pronto para resgatar" />
+              <StatCard label="Pendente" value={formatBRL(saldoPendente)} sub={`Aguardando ${CONFIG.JANELA_DEVOLUCAO_DIAS}d de prazo`} />
+              <StatCard label="Total em vendas" value={formatBRL(totalGerado)} sub={`${totalVendas} pedido(s)`} />
+              <StatCard label="Comissão total" value={formatBRL(comissoes.reduce((s,c)=>s+c.valor_comissao,0))} sub="Desde o início" />
+            </div>
+
+            <Card>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-sm text-gray-700">Últimas vendas</h3>
+                <Button variant="ghost" onClick={sincronizarVendas} loading={sincronizando} className="text-xs">
+                  Sincronizar
+                </Button>
+              </div>
+              {comissoes.slice(0, 3).length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">Nenhuma venda registrada ainda.</p>
+              ) : comissoes.slice(0, 3).map(c => (
+                <div key={c.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Pedido #{c.pedido_id}</p>
+                    <p className="text-xs text-gray-400">{formatDate(c.criado_em)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-900">{formatBRL(c.valor_comissao)}</p>
+                    <Badge color={statusBadge[c.status]?.[0] || "gray"}>{statusBadge[c.status]?.[1] || c.status}</Badge>
+                  </div>
+                </div>
+              ))}
+              {comissoes.length > 3 && (
+                <button onClick={() => setTab("vendas")} className="text-xs text-gray-400 hover:text-gray-700 mt-2 w-full text-center">
+                  Ver todas ({comissoes.length})
+                </button>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* TAB: VENDAS */}
+        {tab === "vendas" && (
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Histórico de vendas</h3>
+              <Button variant="ghost" onClick={sincronizarVendas} loading={sincronizando} className="text-xs">
+                Sincronizar
+              </Button>
+            </div>
+            {comissoes.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">Nenhuma venda registrada ainda.<br/>Compartilhe seu cupom para começar!</p>
+            ) : (
+              <div className="space-y-0">
+                {comissoes.map(c => (
+                  <div key={c.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Pedido #{c.pedido_id}</p>
+                      <p className="text-xs text-gray-400">{formatDate(c.criado_em)} · Pedido: {formatBRL(c.valor_pedido)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">+{formatBRL(c.valor_comissao)}</p>
+                      <Badge color={statusBadge[c.status]?.[0] || "gray"}>{statusBadge[c.status]?.[1] || c.status}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* TAB: RESGATAR */}
+        {tab === "resgatar" && (
+          <div className="space-y-4">
+            <Card>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Saldo disponível para resgate</p>
+              <p className="text-3xl font-bold text-gray-900 mb-1">{formatBRL(saldoConfirmado)}</p>
+              {saldoPendente > 0 && (
+                <p className="text-xs text-yellow-600">{formatBRL(saldoPendente)} pendente (aguardando prazo de devolução)</p>
+              )}
+            </Card>
+
+            {saldoConfirmado > 0 && (
+              <Card>
+                <h3 className="font-semibold text-gray-900 mb-4">Solicitar resgate</h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Forma de resgate</p>
+                    <div className="flex gap-3">
+                      {[["credito", "Crédito na loja"], ["pix", "Pix"]].map(([val, lbl]) => (
+                        <button key={val} onClick={() => setFormResgate(f => ({ ...f, tipo: val }))}
+                          className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${formResgate.tipo === val ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}>
+                          {lbl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {formResgate.tipo === "pix" && (
+                    <Input label="Chave Pix" value={formResgate.pix_key}
+                      onChange={e => setFormResgate(f => ({ ...f, pix_key: e.target.value }))}
+                      placeholder="CPF, e-mail, telefone ou chave aleatória" />
+                  )}
+
+                  <Alert message={msgResgate} type={msgResgate.includes("sucesso") ? "success" : "error"} />
+
+                  <Button onClick={solicitarResgate} loading={resgatando} className="w-full">
+                    Solicitar {formatBRL(saldoConfirmado)}
+                  </Button>
+                  <p className="text-xs text-gray-400 text-center">
+                    Resgates são processados em até 5 dias úteis.
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {resgates.length > 0 && (
+              <Card>
+                <h3 className="font-semibold text-gray-900 mb-3">Histórico de resgates</h3>
+                {resgates.map(r => (
+                  <div key={r.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{r.tipo === "pix" ? "Pix" : "Crédito na loja"}</p>
+                      <p className="text-xs text-gray-400">{formatDate(r.criado_em)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">{formatBRL(r.valor)}</p>
+                      <Badge color={resgatesBadge[r.status]?.[0] || "gray"}>{resgatesBadge[r.status]?.[1] || r.status}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── ADMIN
+function PageAdmin({ user, onLogout }) {
+  const [embaixadores, setEmbaixadores] = React.useState([]);
+  const [resgates, setResgates] = React.useState([]);
+  const [comunicacoes, setComunicacoes] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [tab, setTab] = React.useState("embaixadores");
+  const [busca, setBusca] = React.useState("");
+
+  React.useEffect(() => { carregarDados(); }, []);
+
+  async function carregarDados() {
+    setLoading(true);
+    const { data: embs } = await supabase.from("embaixadores").select("*, comissoes(valor_comissao, status, resgatada)").order("criado_em", { ascending: false });
+    setEmbaixadores(embs || []);
+
+    const { data: ress } = await supabase.from("resgates").select("*, embaixadores(nome, email, cupom)").eq("status", "solicitado").order("criado_em", { ascending: false });
+    setResgates(ress || []);
+
+    // Fila de comunicações: novos (últimas 24h) + inativos
+    const ontem = new Date(Date.now() - 86400000).toISOString();
+    const { data: novos } = await supabase.from("embaixadores").select("id, nome, whatsapp, cupom, criado_em").gte("criado_em", ontem);
+
+    const trintaDias = new Date(Date.now() - 30 * 86400000).toISOString();
+    const { data: inativos } = await supabase.from("embaixadores")
+      .select("id, nome, whatsapp, cupom, ultimo_acesso")
+      .lt("ultimo_acesso", trintaDias)
+      .eq("status", "ativo");
+
+    const fila = [
+      ...(novos || []).map(e => ({ ...e, motivo: "Novo cadastro — enviar boas-vindas", prioridade: "alta" })),
+      ...(inativos || []).map(e => ({ ...e, motivo: "Inativo há +30 dias — reengajar", prioridade: "media" })),
+    ];
+    setComunicacoes(fila);
+    setLoading(false);
+  }
+
+  async function aprovarResgate(id, tipo) {
+    await supabase.from("resgates").update({ status: tipo === "credito" ? "aprovado" : "aprovado" }).eq("id", id);
+    await carregarDados();
+  }
+
+  async function recusarResgate(id) {
+    await supabase.from("resgates").update({ status: "recusado" }).eq("id", id);
+    await carregarDados();
+  }
+
+  async function marcarComunicado(id) {
+    await supabase.from("embaixadores").update({ ultimo_contato: new Date().toISOString() }).eq("id", id);
+    setComunicacoes(c => c.filter(x => x.id !== id));
+  }
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  const embsFiltrados = embaixadores.filter(e =>
+    !busca || e.nome?.toLowerCase().includes(busca.toLowerCase()) || e.email?.toLowerCase().includes(busca.toLowerCase()) || e.cupom?.toLowerCase().includes(busca.toLowerCase())
+  );
+
+  const totalAtivos = embaixadores.filter(e => e.status === "ativo").length;
+  const totalResgatesPendentes = resgates.length;
+
+  const tabs = [
+    { id: "embaixadores", label: `Embaixadores (${embaixadores.length})` },
+    { id: "resgates", label: `Resgates${resgates.length > 0 ? ` (${resgates.length})` : ""}` },
+    { id: "comunicacoes", label: `Fila${comunicacoes.length > 0 ? ` (${comunicacoes.length})` : ""}` },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div>
+            <Logo size="sm" />
+            <span className="text-xs bg-gray-900 text-white rounded-full px-2 py-0.5 ml-2 font-medium">Admin</span>
+          </div>
+          <button onClick={onLogout} className="text-xs text-gray-400 hover:text-gray-700">Sair</button>
+        </div>
+      </header>
+
+      <div className="max-w-4xl mx-auto p-4 space-y-4 fade-in">
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Embaixadores ativos" value={totalAtivos} />
+          <StatCard label="Resgates pendentes" value={totalResgatesPendentes} />
+          <StatCard label="Fila de contato" value={comunicacoes.length} />
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all ${tab === t.id ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* TAB: EMBAIXADORES */}
+        {tab === "embaixadores" && (
+          <Card>
+            <div className="mb-4">
+              <Input placeholder="Buscar por nome, e-mail ou cupom..." value={busca} onChange={e => setBusca(e.target.value)} />
+            </div>
+            {embsFiltrados.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">Nenhum embaixador encontrado.</p>
+            ) : (
+              <div className="space-y-0">
+                {embsFiltrados.map(e => {
+                  const totalComissao = (e.comissoes || []).reduce((s, c) => s + (c.valor_comissao || 0), 0);
+                  const saldo = (e.comissoes || []).filter(c => c.status === "confirmada" && !c.resgatada).reduce((s, c) => s + c.valor_comissao, 0);
+                  return (
+                    <div key={e.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{e.nome}</p>
+                        <p className="text-xs text-gray-400">{e.email} · {e.whatsapp}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">{e.cupom}</span>
+                          <Badge color={e.status === "ativo" ? "green" : "gray"}>{e.status}</Badge>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-900">{formatBRL(totalComissao)}</p>
+                        <p className="text-xs text-gray-400">total gerado</p>
+                        <p className="text-xs text-green-600 font-medium">{formatBRL(saldo)} disponível</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* TAB: RESGATES */}
+        {tab === "resgates" && (
+          <Card>
+            <h3 className="font-semibold text-gray-900 mb-4">Resgates solicitados</h3>
+            {resgates.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">Nenhum resgate pendente.</p>
+            ) : (
+              <div className="space-y-4">
+                {resgates.map(r => (
+                  <div key={r.id} className="border border-gray-100 rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-semibold text-gray-900">{r.embaixadores?.nome}</p>
+                        <p className="text-xs text-gray-400">{r.embaixadores?.email}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Solicitado em {formatDate(r.criado_em)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-gray-900">{formatBRL(r.valor)}</p>
+                        <Badge color="yellow">{r.tipo === "pix" ? "Pix" : "Crédito"}</Badge>
+                      </div>
+                    </div>
+                    {r.tipo === "pix" && r.pix_key && (
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 mb-3">
+                        <p className="text-xs text-gray-400 mb-0.5">Chave Pix</p>
+                        <p className="text-sm font-mono text-gray-900">{r.pix_key}</p>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button onClick={() => aprovarResgate(r.id, r.tipo)} variant="primary" className="flex-1">
+                        ✓ Aprovar
+                      </Button>
+                      <Button onClick={() => recusarResgate(r.id)} variant="danger" className="flex-1">
+                        ✗ Recusar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* TAB: FILA DE COMUNICAÇÕES */}
+        {tab === "comunicacoes" && (
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Fila de comunicações manuais</h3>
+              <p className="text-xs text-gray-400">Enviar via WhatsApp</p>
+            </div>
+            {comunicacoes.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">Nenhuma comunicação pendente. 🎉</p>
+            ) : (
+              <div className="space-y-3">
+                {comunicacoes.map(c => (
+                  <div key={c.id} className="flex items-center justify-between border border-gray-100 rounded-xl p-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-semibold text-gray-900">{c.nome}</p>
+                        <Badge color={c.prioridade === "alta" ? "red" : "yellow"}>
+                          {c.prioridade === "alta" ? "Novo" : "Inativo"}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-400">{c.whatsapp}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{c.motivo}</p>
+                    </div>
+                    <div className="flex flex-col gap-1.5 ml-3">
+                      <a href={`https://wa.me/55${c.whatsapp?.replace(/\D/g, "")}?text=Oi ${c.nome?.split(" ")[0]}!`}
+                        target="_blank" rel="noopener noreferrer">
+                        <Button variant="secondary" className="text-xs whitespace-nowrap">Abrir WA</Button>
+                      </a>
+                      <Button variant="ghost" onClick={() => marcarComunicado(c.id)} className="text-xs whitespace-nowrap">
+                        Feito ✓
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
+// APP ROOT — roteamento simples por hash
+// ─────────────────────────────────────────
+function App() {
+  const [page, setPage] = React.useState(() => window.location.hash.replace("#","") || "cadastro");
+  const [user, setUser] = React.useState(null);
+  const [checkingAuth, setCheckingAuth] = React.useState(true);
+
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user || null);
+      setCheckingAuth(false);
+    });
+    supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user || null);
+    });
+  }, []);
+
+  React.useEffect(() => {
+    window.location.hash = page;
+  }, [page]);
+
+  function navigate(p) { setPage(p); }
+
+  function handleLogin(u) {
+    setUser(u);
+    // Admin: defina aqui os e-mails com acesso admin
+    const ADMINS = ["admin@saintgermain.com.br"];
+    setPage(ADMINS.includes(u.email) ? "admin" : "painel");
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    setUser(null);
+    setPage("login");
+  }
+
+  if (checkingAuth) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (page === "cadastro") return <PageCadastro onNavigate={navigate} />;
+  if (page === "login") return <PageLogin onLogin={handleLogin} onNavigate={navigate} />;
+  if (page === "painel") {
+    if (!user) return <PageLogin onLogin={handleLogin} onNavigate={navigate} />;
+    return <PagePainel user={user} onLogout={handleLogout} />;
+  }
+  if (page === "admin") {
+    if (!user) return <PageLogin onLogin={handleLogin} onNavigate={navigate} />;
+    return <PageAdmin user={user} onLogout={handleLogout} />;
+  }
+
+  return <PageCadastro onNavigate={navigate} />;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
