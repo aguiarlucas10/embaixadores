@@ -8,671 +8,494 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Questrial&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    * { font-family: 'Inter', sans-serif; }
-    .fade-in { animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Questrial', sans-serif; background: #fff; color: #000; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fade-up { animation: fadeUp 0.5s ease forwards; }
+    .fade-in { animation: fadeIn 0.35s ease forwards; }
+    .stagger > * { opacity:0; animation: fadeUp 0.5s ease forwards; }
+    .stagger > *:nth-child(1) { animation-delay:0.04s; }
+    .stagger > *:nth-child(2) { animation-delay:0.10s; }
+    .stagger > *:nth-child(3) { animation-delay:0.16s; }
+    .stagger > *:nth-child(4) { animation-delay:0.22s; }
+    .stagger > *:nth-child(5) { animation-delay:0.28s; }
+    .stagger > *:nth-child(6) { animation-delay:0.34s; }
+    .sg-input:focus { border-bottom: 2px solid #000 !important; }
+    .sg-btn-primary:hover:not(:disabled) { opacity: 0.85; }
+    .sg-btn-secondary:hover { background: #000 !important; color: #fff !important; }
+    .sg-btn-ghost:hover { color: #000 !important; }
+    .sg-tab:hover { color: #000 !important; }
+    input[type=checkbox] { accent-color: #000; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #fff; }
+    ::-webkit-scrollbar-thumb { background: #d0d0d0; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-
+<body>
 <div id="root"></div>
-
 <script type="text/babel">
 
-// ─────────────────────────────────────────
-// CONFIGURAÇÃO — substitua pelos seus valores
-// ─────────────────────────────────────────
+// ── CONFIG ──────────────────────────────────────────────────────────────────
 const CONFIG = {
-SUPABASE_URL_AQUI       → https://fsfqnshkfwnfeswwdmxg.supabase.co,
-SUPABASE_ANON_KEY_AQUI  → sb_secret_shWt05xFU7qhIQWfOcEvLQ_KQplw4Au,
-NUVEMSHOP_USER_ID_AQUI  → 1116055,
-NUVEMSHOP_TOKEN_AQUI    → 803dbce287de76eb31d88c26c30e60c72126bb22,
-  COMISSAO_PCT: 0.15,
-  JANELA_DEVOLUCAO_DIAS: 7,
+  SUPABASE_URL:        "SUPABASE_URL_AQUI",
+  SUPABASE_ANON_KEY:   "SUPABASE_ANON_KEY_AQUI",
+  NUVEMSHOP_USER_ID:   "NUVEMSHOP_USER_ID_AQUI",
+  NUVEMSHOP_TOKEN:     "NUVEMSHOP_TOKEN_AQUI",
+  COMISSAO_PCT:        0.15,
+  JANELA_DEVOLUCAO:    7,
+  ADMIN_EMAILS:        ["admin@saintgermain.com.br"],
 };
 
-// ─────────────────────────────────────────
-// SUPABASE CLIENT
-// ─────────────────────────────────────────
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
-// ─────────────────────────────────────────
-// NUVEMSHOP API (via proxy ou direto se CORS permitir)
-// ─────────────────────────────────────────
-const nuvemshop = {
-  baseUrl: `https://api.nuvemshop.com.br/v1/${CONFIG.NUVEMSHOP_USER_ID}`,
-  headers: {
-    "Authentication": `bearer ${CONFIG.NUVEMSHOP_TOKEN}`,
-    "Content-Type": "application/json",
-    "User-Agent": "SaintGermain-Embaixadores/1.0",
+// ── NUVEMSHOP API ────────────────────────────────────────────────────────────
+const NS = {
+  base: `https://api.nuvemshop.com.br/v1/${CONFIG.NUVEMSHOP_USER_ID}`,
+  h: { "Authentication":`bearer ${CONFIG.NUVEMSHOP_TOKEN}`, "Content-Type":"application/json", "User-Agent":"SaintGermain/1.0" },
+  async ordersByEmail(email) {
+    try { const r = await fetch(`${this.base}/orders?q=${encodeURIComponent(email)}&fields=id,total,coupon,created_at,payment_status`,{headers:this.h}); return r.ok?r.json():[]; } catch{return[];}
   },
-
-  async getOrdersByEmail(email) {
-    const res = await fetch(`${this.baseUrl}/orders?q=${encodeURIComponent(email)}&fields=id,total,coupon,created_at,payment_status`, { headers: this.headers });
-    if (!res.ok) return [];
-    return res.json();
+  async ordersByCoupon(code) {
+    try { const r = await fetch(`${this.base}/orders?coupon=${encodeURIComponent(code)}&fields=id,total,coupon,created_at,payment_status`,{headers:this.h}); return r.ok?r.json():[]; } catch{return[];}
   },
-
-  async getOrdersByCoupon(couponCode) {
-    const res = await fetch(`${this.baseUrl}/orders?coupon=${encodeURIComponent(couponCode)}&fields=id,total,coupon,created_at,payment_status`, { headers: this.headers });
-    if (!res.ok) return [];
-    return res.json();
-  },
-
-  async createCoupon(code, email) {
-    const body = {
-      code,
-      type: "percentage",
-      value: CONFIG.COMISSAO_PCT * 100,
-      valid: true,
-      max_uses: null,
-      start_date: new Date().toISOString().split("T")[0],
-      categories: [],
-      min_price: "0.00",
-      includes_shipping: false,
-    };
-    const res = await fetch(`${this.baseUrl}/coupons`, {
-      method: "POST",
-      headers: this.headers,
-      body: JSON.stringify(body),
-    });
-    return res.ok;
+  async createCoupon(code) {
+    try { const r = await fetch(`${this.base}/coupons`,{method:"POST",headers:this.h,body:JSON.stringify({code,type:"percentage",value:CONFIG.COMISSAO_PCT*100,valid:true,max_uses:null,min_price:"0.00",includes_shipping:false})}); return r.ok; } catch{return false;}
   },
 };
 
-// ─────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────
-function gerarCupom(nome) {
-  const base = nome.trim().toUpperCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 10);
-  return `SG${base}`;
-}
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+const gerarCupom = n => "SG" + n.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"").slice(0,10);
+const brl = v => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v||0);
+const fmt = s => new Date(s).toLocaleDateString("pt-BR");
+const diasPassados = (d,n) => (Date.now()-new Date(d).getTime())/86400000>=n;
 
-function formatBRL(val) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
-}
+// ── DESIGN TOKENS ────────────────────────────────────────────────────────────
+const T = {
+  serif: "'Cormorant Garamond', serif",
+  sans:  "'Questrial', sans-serif",
+  black: "#000",
+  white: "#fff",
+  g100: "#f5f5f5",
+  g200: "#e8e8e8",
+  g300: "#d0d0d0",
+  g400: "#a0a0a0",
+  g500: "#707070",
+  g600: "#404040",
+};
 
-function formatDate(str) {
-  return new Date(str).toLocaleDateString("pt-BR");
-}
+// ── ATOMS ────────────────────────────────────────────────────────────────────
 
-function diaPassou(dateStr, dias) {
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 86400000;
-  return diff >= dias;
-}
-
-// ─────────────────────────────────────────
-// COMPONENTS
-// ─────────────────────────────────────────
-
-function Logo({ size = "md" }) {
-  const sizes = { sm: "text-lg", md: "text-2xl", lg: "text-4xl" };
+function Logo({ sub=true }) {
   return (
-    <div className={`font-bold tracking-widest ${sizes[size]} text-gray-900 uppercase`}>
-      Saint Germain
-      <span className="block text-xs font-normal tracking-wider text-gray-400 mt-0.5">
-        Clientes Embaixadores
-      </span>
+    <div>
+      <div style={{fontFamily:T.sans,fontSize:13,letterSpacing:"0.25em",textTransform:"uppercase",color:T.black}}>Saint Germain</div>
+      {sub && <div style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginTop:1}}>Clientes Embaixadores</div>}
     </div>
   );
 }
 
-function Card({ children, className = "" }) {
+function Header({ user, onLogout, isAdmin=false }) {
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 ${className}`}>
-      {children}
+    <header style={{borderBottom:`1px solid ${T.black}`,padding:"0 32px",height:64,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,background:T.white,zIndex:100}}>
+      <Logo/>
+      <div style={{display:"flex",alignItems:"center",gap:20}}>
+        {isAdmin && <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",border:`1px solid ${T.black}`,padding:"3px 8px"}}>Admin</span>}
+        {user && <button className="sg-btn-ghost" onClick={onLogout} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:"none",cursor:"pointer",color:T.g400,transition:"color 0.15s"}}>Sair</button>}
+      </div>
+    </header>
+  );
+}
+
+function Input({ label, value, onChange, type="text", placeholder="", onKeyDown }) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      <label style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g500}}>{label}</label>
+      <input className="sg-input" type={type} value={value} onChange={onChange} placeholder={placeholder} onKeyDown={onKeyDown}
+        style={{fontFamily:T.sans,fontSize:13,border:"none",borderBottom:`1px solid ${T.black}`,padding:"10px 0",outline:"none",background:"transparent",color:T.black,width:"100%",borderRadius:0,transition:"border-bottom 0.15s"}}/>
     </div>
   );
 }
 
-function Button({ children, onClick, loading, variant = "primary", className = "", disabled }) {
-  const base = "px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 flex items-center justify-center gap-2";
-  const variants = {
-    primary: "bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50",
-    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
-    ghost: "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100",
-  };
+function BtnPrimary({ children, onClick, loading, style:sx={} }) {
   return (
-    <button onClick={onClick} disabled={disabled || loading} className={`${base} ${variants[variant]} ${className}`}>
-      {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : children}
+    <button className="sg-btn-primary" onClick={onClick} disabled={loading}
+      style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",background:T.black,color:T.white,border:"none",padding:"16px 32px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"opacity 0.2s",...sx}}>
+      {loading ? <span style={{width:14,height:14,border:"1.5px solid #fff",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/> : children}
     </button>
   );
 }
 
-function Input({ label, ...props }) {
+function BtnSecondary({ children, onClick, style:sx={} }) {
   return (
-    <div>
-      {label && <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>}
-      <input
-        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
-        {...props}
+    <button className="sg-btn-secondary" onClick={onClick}
+      style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",background:"transparent",color:T.black,border:`1px solid ${T.black}`,padding:"12px 24px",cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all 0.15s",...sx}}>
+      {children}
+    </button>
+  );
+}
+
+function BtnGhost({ children, onClick, style:sx={} }) {
+  return (
+    <button className="sg-btn-ghost" onClick={onClick}
+      style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:"none",cursor:"pointer",color:T.g400,transition:"color 0.15s",...sx}}>
+      {children}
+    </button>
+  );
+}
+
+function Badge({ text, color=T.black }) {
+  return <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",padding:"3px 8px",border:`1px solid ${color}`,color,display:"inline-block"}}>{text}</span>;
+}
+
+function Alert({ msg, ok=false }) {
+  if (!msg) return null;
+  return <div style={{borderLeft:`2px solid ${T.black}`,paddingLeft:12,fontFamily:T.sans,fontSize:12,color:T.g600,lineHeight:1.7}}>{msg}</div>;
+}
+
+function Spinner() {
+  return <div style={{display:"flex",justifyContent:"center",alignItems:"center",minHeight:240}}><div style={{width:18,height:18,border:"1.5px solid #000",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 0.7s linear infinite"}}/></div>;
+}
+
+function Row({ left, right }) {
+  return (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.g100}`,padding:"14px 0"}}>
+      {left}{right}
+    </div>
+  );
+}
+
+function StatGrid({ items, cols=2 }) {
+  return (
+    <div style={{display:"grid",gridTemplateColumns:`repeat(${cols},1fr)`,gap:"1px",background:T.g200,marginBottom:40}}>
+      {items.map(([v,l],i)=>(
+        <div key={i} style={{background:T.white,padding:"20px 16px"}}>
+          <div style={{fontFamily:T.serif,fontSize:28,fontWeight:300,color:T.black,lineHeight:1}}>{v}</div>
+          <div style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginTop:5}}>{l}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Tabs({ tabs, labels, active, onChange }) {
+  return (
+    <div style={{display:"flex",borderBottom:`1px solid ${T.black}`,marginBottom:32}}>
+      {tabs.map(t=>(
+        <button key={t} className="sg-tab" onClick={()=>onChange(t)}
+          style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",padding:"12px 20px",background:"transparent",border:"none",cursor:"pointer",borderBottom:active===t?"2px solid #000":"2px solid transparent",color:active===t?T.black:T.g400,marginBottom:-1,transition:"color 0.15s"}}>
+          {labels[t]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TextLink({ children, onClick }) {
+  return <button onClick={onClick} style={{background:"none",border:"none",cursor:"pointer",fontFamily:T.sans,fontSize:11,textDecoration:"underline",color:T.black}}>{children}</button>;
+}
+
+// ── SPLIT LAYOUT ─────────────────────────────────────────────────────────────
+function SplitLayout({ left, right }) {
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",minHeight:"calc(100vh - 64px)"}}>
+      <div style={{background:T.black,padding:"72px 56px",display:"flex",flexDirection:"column",justifyContent:"space-between"}}>{left}</div>
+      <div style={{padding:"72px 56px",overflowY:"auto"}}>{right}</div>
+    </div>
+  );
+}
+
+// ── PAGE: CADASTRO ────────────────────────────────────────────────────────────
+function PageCadastro({ onNavigate }) {
+  const [f, setF] = React.useState({nome:"",email:"",cpf:"",whatsapp:"",instagram:""});
+  const [ok, setOk] = React.useState(false);
+  const [cupom, setCupom] = React.useState("");
+  const [aceite, setAceite] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  const set = (k,v) => setF(p=>({...p,[k]:v}));
+
+  async function submit() {
+    setErr("");
+    if (!f.nome||!f.email||!f.cpf||!f.whatsapp) { setErr("Preencha todos os campos obrigatórios."); return; }
+    if (!aceite) { setErr("Aceite os termos para continuar."); return; }
+    setLoading(true);
+    try {
+      const {data:ex} = await supabase.from("embaixadores").select("id").eq("email",f.email).single();
+      if (ex) { setErr("Este e-mail já está cadastrado."); setLoading(false); return; }
+      const pedidos = await NS.ordersByEmail(f.email);
+      if (!pedidos||!pedidos.length) { setErr("Não encontramos compras associadas a este e-mail. É necessário ter ao menos uma compra na Saint Germain para participar."); setLoading(false); return; }
+      const cod = gerarCupom(f.nome);
+      const criado = await NS.createCoupon(cod);
+      if (!criado) { setErr("Erro ao criar cupom. Tente novamente."); setLoading(false); return; }
+      const {error:dbErr} = await supabase.from("embaixadores").insert({nome:f.nome,email:f.email,cpf:f.cpf,whatsapp:f.whatsapp,instagram:f.instagram,cupom:cod,status:"ativo",nivel:"embaixador",comissao_pct:CONFIG.COMISSAO_PCT,aceite_termos_em:new Date().toISOString(),criado_em:new Date().toISOString()});
+      if (dbErr) { setErr("Erro ao salvar. Tente novamente."); setLoading(false); return; }
+      setCupom(cod); setOk(true);
+    } catch { setErr("Erro inesperado. Tente novamente."); }
+    setLoading(false);
+  }
+
+  if (ok) return (
+    <div style={{minHeight:"100vh",background:T.white}}>
+      <Header/>
+      <div style={{maxWidth:480,margin:"0 auto",padding:"72px 24px"}} className="stagger">
+        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:32}}>Bem-vindo ao time</p>
+        <h1 style={{fontFamily:T.serif,fontSize:48,fontWeight:300,lineHeight:1.1,marginBottom:48}}>Você agora é<br/>Embaixador<br/><em>Saint Germain.</em></h1>
+        <div style={{background:T.black,padding:"28px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,marginBottom:32}}>
+          <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400}}>Seu cupom exclusivo</span>
+          <span style={{fontFamily:T.sans,fontSize:30,letterSpacing:"0.25em",color:T.white}}>{cupom}</span>
+          <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:T.g500,marginTop:2}}>{(CONFIG.COMISSAO_PCT*100).toFixed(0)}% desconto · {(CONFIG.COMISSAO_PCT*100).toFixed(0)}% comissão por venda</span>
+        </div>
+        <p style={{fontFamily:T.sans,fontSize:13,color:T.g500,lineHeight:1.8,marginBottom:48}}>Em breve você receberá uma mensagem com os detalhes do programa e acesso ao grupo exclusivo.</p>
+        <BtnPrimary onClick={()=>onNavigate("login")}>Acessar meu painel</BtnPrimary>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100vh",background:T.white}}>
+      <Header/>
+      <SplitLayout
+        left={
+          <div className="stagger">
+            <div>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g500,marginBottom:40}}>Clientes Embaixadores</p>
+              <h1 style={{fontFamily:T.serif,fontSize:52,fontWeight:300,color:T.white,lineHeight:1.08,marginBottom:32}}>Faça parte<br/>de algo<br/><em>exclusivo.</em></h1>
+              <p style={{fontFamily:T.sans,fontSize:13,color:T.g500,lineHeight:1.9,maxWidth:300}}>Um convite para clientes que já fazem parte da história da Saint Germain.</p>
+            </div>
+            <p style={{fontFamily:T.serif,fontSize:13,color:T.g600,letterSpacing:"0.1em",fontStyle:"italic"}}>Saint Germain — Est. Brasil</p>
+          </div>
+        }
+        right={
+          <div className="stagger">
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:48}}>Cadastre-se</p>
+            <div style={{display:"flex",flexDirection:"column",gap:28,marginBottom:40}}>
+              <Input label="Nome completo *" value={f.nome} onChange={e=>set("nome",e.target.value)}/>
+              <Input label="E-mail *" type="email" value={f.email} onChange={e=>set("email",e.target.value)} placeholder="O mesmo utilizado na loja"/>
+              <Input label="CPF *" value={f.cpf} onChange={e=>set("cpf",e.target.value)}/>
+              <Input label="WhatsApp *" value={f.whatsapp} onChange={e=>set("whatsapp",e.target.value)}/>
+              <Input label="Instagram" value={f.instagram} onChange={e=>set("instagram",e.target.value)} placeholder="@"/>
+            </div>
+            <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:32}}>
+              <input type="checkbox" id="t" checked={aceite} onChange={e=>setAceite(e.target.checked)} style={{width:14,height:14,marginTop:2,cursor:"pointer",flexShrink:0}}/>
+              <label htmlFor="t" style={{fontFamily:T.sans,fontSize:11,color:T.g500,lineHeight:1.7,cursor:"pointer"}}>Aceito os termos do programa e autorizo o uso da minha imagem em publicações relacionadas ao programa Clientes Embaixadores da Saint Germain.</label>
+            </div>
+            {err && <div style={{marginBottom:24}}><Alert msg={err}/></div>}
+            <BtnPrimary onClick={submit} loading={loading}>Quero fazer parte</BtnPrimary>
+            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:24,textAlign:"center"}}>Já é embaixador?{" "}<TextLink onClick={()=>onNavigate("login")}>Acesse seu painel</TextLink></p>
+          </div>
+        }
       />
     </div>
   );
 }
 
-function Badge({ children, color = "gray" }) {
-  const colors = {
-    gray: "bg-gray-100 text-gray-600",
-    green: "bg-green-100 text-green-700",
-    yellow: "bg-yellow-100 text-yellow-700",
-    blue: "bg-blue-100 text-blue-700",
-    red: "bg-red-100 text-red-600",
-  };
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[color]}`}>
-      {children}
-    </span>
-  );
-}
-
-function Alert({ message, type = "error" }) {
-  if (!message) return null;
-  const styles = {
-    error: "bg-red-50 text-red-700 border-red-200",
-    success: "bg-green-50 text-green-700 border-green-200",
-    info: "bg-blue-50 text-blue-700 border-blue-200",
-  };
-  return (
-    <div className={`rounded-xl border px-4 py-3 text-sm ${styles[type]}`}>
-      {message}
-    </div>
-  );
-}
-
-function StatCard({ label, value, sub }) {
-  return (
-    <div className="bg-gray-50 rounded-xl p-4">
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────
-// PAGES
-// ─────────────────────────────────────────
-
-// ── CADASTRO
-function PageCadastro({ onNavigate }) {
-  const [form, setForm] = React.useState({ nome: "", email: "", cpf: "", whatsapp: "", instagram: "" });
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [success, setSuccess] = React.useState(false);
-  const [cupomGerado, setCupomGerado] = React.useState("");
-  const [aceitou, setAceitou] = React.useState(false);
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  async function handleSubmit() {
-    setError("");
-    if (!form.nome || !form.email || !form.cpf || !form.whatsapp) {
-      setError("Preencha todos os campos obrigatórios."); return;
-    }
-    if (!aceitou) { setError("Aceite os termos para continuar."); return; }
-
-    setLoading(true);
-    try {
-      // Verifica se já existe
-      const { data: existe } = await supabase
-        .from("embaixadores")
-        .select("id")
-        .eq("email", form.email)
-        .single();
-      if (existe) { setError("Este e-mail já está cadastrado no programa."); setLoading(false); return; }
-
-      // Verifica elegibilidade na Nuvemshop
-      const pedidos = await nuvemshop.getOrdersByEmail(form.email);
-      if (!pedidos || pedidos.length === 0) {
-        setError("Não encontramos compras na Saint Germain associadas a este e-mail. Você precisa ter feito pelo menos uma compra para participar.");
-        setLoading(false); return;
-      }
-
-      // Gera cupom
-      const cupom = gerarCupom(form.nome);
-
-      // Cria cupom na Nuvemshop
-      const cupomCriado = await nuvemshop.createCoupon(cupom, form.email);
-      if (!cupomCriado) {
-        setError("Erro ao criar cupom. Tente novamente."); setLoading(false); return;
-      }
-
-      // Salva embaixador no Supabase
-      const { error: dbErr } = await supabase.from("embaixadores").insert({
-        nome: form.nome,
-        email: form.email,
-        cpf: form.cpf,
-        whatsapp: form.whatsapp,
-        instagram: form.instagram,
-        cupom,
-        status: "ativo",
-        nivel: "embaixador",
-        comissao_pct: CONFIG.COMISSAO_PCT,
-        aceite_termos_em: new Date().toISOString(),
-        criado_em: new Date().toISOString(),
-      });
-
-      if (dbErr) { setError("Erro ao salvar cadastro. Tente novamente."); setLoading(false); return; }
-
-      setCupomGerado(cupom);
-      setSuccess(true);
-    } catch (e) {
-      setError("Erro inesperado. Tente novamente.");
-    }
-    setLoading(false);
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md fade-in text-center">
-          <div className="text-5xl mb-4">🖤</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Bem-vindo(a) ao time!</h2>
-          <p className="text-gray-500 mb-6">Você agora é um Embaixador Saint Germain.</p>
-          <Card className="mb-4">
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Seu cupom exclusivo</p>
-            <div className="bg-gray-900 text-white rounded-xl py-4 px-6 text-2xl font-bold tracking-widest mb-2">
-              {cupomGerado}
-            </div>
-            <p className="text-xs text-gray-400">
-              {(CONFIG.COMISSAO_PCT * 100).toFixed(0)}% de desconto para quem usar · {(CONFIG.COMISSAO_PCT * 100).toFixed(0)}% de comissão para você
-            </p>
-          </Card>
-          <p className="text-sm text-gray-500 mb-6">Em breve você receberá uma mensagem com todos os detalhes do programa.</p>
-          <Button onClick={() => onNavigate("login")}>Acessar meu painel</Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-      <div className="w-full max-w-md fade-in">
-        <div className="text-center mb-8">
-          <Logo size="lg" />
-          <p className="text-gray-500 mt-3 text-sm">Um convite para quem já faz parte da nossa história.</p>
-        </div>
-
-        <Card>
-          <h2 className="font-semibold text-gray-900 mb-1">Cadastre-se no programa</h2>
-          <p className="text-sm text-gray-400 mb-6">Apenas para clientes com histórico de compra.</p>
-
-          <div className="space-y-4">
-            <Input label="Nome completo *" value={form.nome} onChange={e => set("nome", e.target.value)} placeholder="Seu nome" />
-            <Input label="E-mail *" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="O mesmo usado na loja" />
-            <Input label="CPF *" value={form.cpf} onChange={e => set("cpf", e.target.value)} placeholder="000.000.000-00" />
-            <Input label="WhatsApp *" value={form.whatsapp} onChange={e => set("whatsapp", e.target.value)} placeholder="(11) 99999-9999" />
-            <Input label="Instagram (opcional)" value={form.instagram} onChange={e => set("instagram", e.target.value)} placeholder="@seuinstagram" />
-
-            <div className="flex items-start gap-3 pt-1">
-              <input type="checkbox" id="termos" checked={aceitou} onChange={e => setAceitou(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-gray-900 cursor-pointer" />
-              <label htmlFor="termos" className="text-xs text-gray-500 cursor-pointer">
-                Aceito os termos de uso do programa e autorizo o uso da minha imagem em publicações da Saint Germain relacionadas ao programa Clientes Embaixadores.
-              </label>
-            </div>
-
-            <Alert message={error} type="error" />
-
-            <Button onClick={handleSubmit} loading={loading} className="w-full">
-              Quero fazer parte
-            </Button>
-          </div>
-        </Card>
-
-        <p className="text-center text-xs text-gray-400 mt-4">
-          Já é embaixador?{" "}
-          <button onClick={() => onNavigate("login")} className="text-gray-700 font-medium hover:underline">
-            Acesse seu painel
-          </button>
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── LOGIN
+// ── PAGE: LOGIN ───────────────────────────────────────────────────────────────
 function PageLogin({ onLogin, onNavigate }) {
   const [email, setEmail] = React.useState("");
   const [senha, setSenha] = React.useState("");
   const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
+  const [err, setErr] = React.useState("");
 
-  async function handleLogin() {
-    setError(""); setLoading(true);
-    const { data, error: err } = await supabase.auth.signInWithPassword({ email, password: senha });
-    if (err) { setError("E-mail ou senha incorretos."); setLoading(false); return; }
-    onLogin(data.user);
-    setLoading(false);
+  async function submit() {
+    setErr(""); setLoading(true);
+    const {data,error:e} = await supabase.auth.signInWithPassword({email,password:senha});
+    if (e) { setErr("E-mail ou senha incorretos."); setLoading(false); return; }
+    onLogin(data.user); setLoading(false);
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-      <div className="w-full max-w-sm fade-in">
-        <div className="text-center mb-8">
-          <Logo size="lg" />
-        </div>
-        <Card>
-          <h2 className="font-semibold text-gray-900 mb-5">Entrar no painel</h2>
-          <div className="space-y-4">
-            <Input label="E-mail" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" />
-            <Input label="Senha" type="password" value={senha} onChange={e => setSenha(e.target.value)} placeholder="••••••••"
-              onKeyDown={e => e.key === "Enter" && handleLogin()} />
-            <Alert message={error} />
-            <Button onClick={handleLogin} loading={loading} className="w-full">Entrar</Button>
+    <div style={{minHeight:"100vh",background:T.white}}>
+      <Header/>
+      <SplitLayout
+        left={
+          <div className="stagger" style={{display:"flex",flexDirection:"column",justifyContent:"center",height:"100%"}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g500,marginBottom:40}}>Painel do Embaixador</p>
+            <h1 style={{fontFamily:T.serif,fontSize:52,fontWeight:300,color:T.white,lineHeight:1.08}}>Bem-vindo<br/><em>de volta.</em></h1>
           </div>
-        </Card>
-        <p className="text-center text-xs text-gray-400 mt-4">
-          Ainda não é embaixador?{" "}
-          <button onClick={() => onNavigate("cadastro")} className="text-gray-700 font-medium hover:underline">
-            Cadastre-se
-          </button>
-        </p>
-      </div>
+        }
+        right={
+          <div className="stagger" style={{display:"flex",flexDirection:"column",justifyContent:"center",height:"100%"}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:48}}>Entrar</p>
+            <div style={{display:"flex",flexDirection:"column",gap:28,marginBottom:40}}>
+              <Input label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+              <Input label="Senha" type="password" value={senha} onChange={e=>setSenha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()}/>
+            </div>
+            {err && <div style={{marginBottom:24}}><Alert msg={err}/></div>}
+            <BtnPrimary onClick={submit} loading={loading}>Entrar</BtnPrimary>
+            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:24,textAlign:"center"}}>Ainda não é embaixador?{" "}<TextLink onClick={()=>onNavigate("cadastro")}>Cadastre-se</TextLink></p>
+          </div>
+        }
+      />
     </div>
   );
 }
 
-// ── PAINEL DO EMBAIXADOR
+// ── PAGE: PAINEL ──────────────────────────────────────────────────────────────
 function PagePainel({ user, onLogout }) {
-  const [embaixador, setEmbaixador] = React.useState(null);
-  const [comissoes, setComissoes] = React.useState([]);
-  const [resgates, setResgates] = React.useState([]);
+  const [emb, setEmb] = React.useState(null);
+  const [cs, setCs] = React.useState([]);
+  const [rs, setRs] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [tab, setTab] = React.useState("inicio");
+  const [sync, setSync] = React.useState(false);
+  const [fResgate, setFResgate] = React.useState({tipo:"credito",pix:""});
+  const [msgR, setMsgR] = React.useState({text:"",ok:false});
   const [resgatando, setResgatando] = React.useState(false);
-  const [formResgate, setFormResgate] = React.useState({ tipo: "credito", pix_key: "" });
-  const [msgResgate, setMsgResgate] = React.useState("");
-  const [sincronizando, setSincronizando] = React.useState(false);
 
-  React.useEffect(() => { carregarDados(); }, []);
+  React.useEffect(()=>{load();},[]);
 
-  async function carregarDados() {
+  async function load() {
     setLoading(true);
-    const { data: emb } = await supabase.from("embaixadores").select("*").eq("email", user.email).single();
-    if (!emb) { setLoading(false); return; }
-    setEmbaixador(emb);
-
-    const { data: comms } = await supabase.from("comissoes").select("*").eq("embaixador_id", emb.id).order("criado_em", { ascending: false });
-    setComissoes(comms || []);
-
-    const { data: ress } = await supabase.from("resgates").select("*").eq("embaixador_id", emb.id).order("criado_em", { ascending: false });
-    setResgates(ress || []);
+    const {data:e} = await supabase.from("embaixadores").select("*").eq("email",user.email).single();
+    if (!e){setLoading(false);return;}
+    setEmb(e);
+    const {data:c} = await supabase.from("comissoes").select("*").eq("embaixador_id",e.id).order("criado_em",{ascending:false});
+    setCs(c||[]);
+    const {data:r} = await supabase.from("resgates").select("*").eq("embaixador_id",e.id).order("criado_em",{ascending:false});
+    setRs(r||[]);
     setLoading(false);
   }
 
-  async function sincronizarVendas() {
-    if (!embaixador) return;
-    setSincronizando(true);
-    try {
-      const pedidos = await nuvemshop.getOrdersByCoupon(embaixador.cupom);
-      let novos = 0;
-      for (const pedido of (pedidos || [])) {
-        const { data: existe } = await supabase.from("comissoes").select("id").eq("pedido_id", String(pedido.id)).single();
-        if (existe) continue;
-
-        const valorPedido = parseFloat(pedido.total);
-        const comissaoValor = valorPedido * CONFIG.COMISSAO_PCT;
-        const confirmado = pedido.payment_status === "paid" && diaPassou(pedido.created_at, CONFIG.JANELA_DEVOLUCAO_DIAS);
-
-        await supabase.from("comissoes").insert({
-          embaixador_id: embaixador.id,
-          pedido_id: String(pedido.id),
-          valor_pedido: valorPedido,
-          valor_comissao: comissaoValor,
-          status: confirmado ? "confirmada" : "pendente",
-          criado_em: pedido.created_at,
-        });
-        novos++;
-      }
-      await carregarDados();
-      if (novos === 0) alert("Nenhuma venda nova encontrada.");
-      else alert(`${novos} venda(s) sincronizada(s)!`);
-    } catch (e) {
-      alert("Erro ao sincronizar. Tente novamente.");
+  async function sincronizar() {
+    if(!emb)return; setSync(true);
+    const pedidos = await NS.ordersByCoupon(emb.cupom);
+    for(const p of (pedidos||[])){
+      const {data:ex}=await supabase.from("comissoes").select("id").eq("pedido_id",String(p.id)).single();
+      if(ex)continue;
+      const val=parseFloat(p.total);
+      await supabase.from("comissoes").insert({embaixador_id:emb.id,pedido_id:String(p.id),valor_pedido:val,valor_comissao:val*CONFIG.COMISSAO_PCT,status:(p.payment_status==="paid"&&diasPassados(p.created_at,CONFIG.JANELA_DEVOLUCAO))?"confirmada":"pendente",criado_em:p.created_at});
     }
-    setSincronizando(false);
+    await load(); setSync(false);
   }
 
-  async function solicitarResgate() {
-    const saldo = comissoes.filter(c => c.status === "confirmada" && !c.resgatada).reduce((s, c) => s + c.valor_comissao, 0);
-    if (saldo <= 0) { setMsgResgate("Você não tem saldo disponível para resgate."); return; }
-    if (formResgate.tipo === "pix" && !formResgate.pix_key) { setMsgResgate("Informe a chave Pix."); return; }
-
+  async function resgatar() {
+    const saldo=cs.filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+c.valor_comissao,0);
+    if(saldo<=0){setMsgR({text:"Nenhum saldo disponível para resgate.",ok:false});return;}
+    if(fResgate.tipo==="pix"&&!fResgate.pix){setMsgR({text:"Informe a chave Pix.",ok:false});return;}
     setResgatando(true);
-    const { error } = await supabase.from("resgates").insert({
-      embaixador_id: embaixador.id,
-      valor: saldo,
-      tipo: formResgate.tipo,
-      pix_key: formResgate.tipo === "pix" ? formResgate.pix_key : null,
-      status: "solicitado",
-      criado_em: new Date().toISOString(),
-    });
-    if (!error) {
-      await supabase.from("comissoes").update({ resgatada: true }).eq("embaixador_id", embaixador.id).eq("status", "confirmada").is("resgatada", null);
-      setMsgResgate("Resgate solicitado com sucesso! O time entrará em contato em breve.");
-      await carregarDados();
-    } else {
-      setMsgResgate("Erro ao solicitar resgate. Tente novamente.");
-    }
-    setResgatando(false);
+    await supabase.from("resgates").insert({embaixador_id:emb.id,valor:saldo,tipo:fResgate.tipo,pix_key:fResgate.tipo==="pix"?fResgate.pix:null,status:"solicitado",criado_em:new Date().toISOString()});
+    await supabase.from("comissoes").update({resgatada:true}).eq("embaixador_id",emb.id).eq("status","confirmada").is("resgatada",null);
+    setMsgR({text:"Resgate solicitado com sucesso. O time entrará em contato em breve.",ok:true});
+    await load(); setResgatando(false);
   }
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  if(loading) return <div style={{minHeight:"100vh"}}><Header user={user} onLogout={onLogout}/><Spinner/></div>;
+  if(!emb) return <div style={{minHeight:"100vh"}}><Header user={user} onLogout={onLogout}/><div style={{maxWidth:480,margin:"64px auto",padding:"0 24px"}}><Alert msg="Cadastro não encontrado para este e-mail."/></div></div>;
 
-  if (!embaixador) return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="text-center max-w-sm">
-        <p className="text-gray-500 mb-4">Cadastro não encontrado para este e-mail.</p>
-        <Button onClick={onLogout} variant="secondary">Voltar</Button>
-      </Card>
-    </div>
-  );
-
-  const totalVendas = comissoes.length;
-  const totalGerado = comissoes.reduce((s, c) => s + c.valor_pedido, 0);
-  const saldoConfirmado = comissoes.filter(c => c.status === "confirmada" && !c.resgatada).reduce((s, c) => s + c.valor_comissao, 0);
-  const saldoPendente = comissoes.filter(c => c.status === "pendente").reduce((s, c) => s + c.valor_comissao, 0);
-
-  const statusBadge = { confirmada: ["green", "Confirmada"], pendente: ["yellow", "Pendente"], paga: ["blue", "Paga"] };
-  const resgatesBadge = { solicitado: ["yellow", "Solicitado"], aprovado: ["green", "Aprovado"], pago: ["blue", "Pago"], recusado: ["red", "Recusado"] };
-
-  const tabs = [
-    { id: "inicio", label: "Início" },
-    { id: "vendas", label: `Vendas (${totalVendas})` },
-    { id: "resgatar", label: "Resgatar" },
-  ];
+  const saldoDisp = cs.filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+c.valor_comissao,0);
+  const saldoPend = cs.filter(c=>c.status==="pendente").reduce((s,c)=>s+c.valor_comissao,0);
+  const bStatus = {confirmada:["#000","Confirmada"],pendente:[T.g400,"Pendente"],paga:["#000","Paga"]};
+  const bResgate = {solicitado:[T.g400,"Solicitado"],aprovado:["#000","Aprovado"],pago:["#000","Pago"],recusado:["#c00","Recusado"]};
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <Logo size="sm" />
-          <button onClick={onLogout} className="text-xs text-gray-400 hover:text-gray-700">Sair</button>
-        </div>
-      </header>
-
-      <div className="max-w-2xl mx-auto p-4 space-y-4 fade-in">
+    <div style={{minHeight:"100vh",background:T.white}}>
+      <Header user={user} onLogout={onLogout}/>
+      <div style={{maxWidth:960,margin:"0 auto",padding:"48px 32px 80px"}} className="fade-in">
 
         {/* Saudação */}
-        <div className="pt-2">
-          <h1 className="text-xl font-bold text-gray-900">Olá, {embaixador.nome.split(" ")[0]} 👋</h1>
-          <p className="text-sm text-gray-400">Embaixadora Saint Germain</p>
+        <div style={{marginBottom:40}}>
+          <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>Olá, {emb.nome.split(" ")[0]}</p>
+          <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300}}>Embaixador Saint Germain</h2>
         </div>
 
         {/* Cupom */}
-        <Card>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Seu cupom exclusivo</p>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 bg-gray-900 text-white rounded-xl py-3 px-5 text-xl font-bold tracking-widest text-center">
-              {embaixador.cupom}
-            </div>
-            <Button
-              variant="secondary"
-              onClick={() => { navigator.clipboard.writeText(embaixador.cupom); alert("Cupom copiado!"); }}
-            >
-              Copiar
-            </Button>
+        <div style={{background:T.black,padding:"24px 32px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:40}}>
+          <div>
+            <p style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g500,marginBottom:6}}>Seu cupom exclusivo</p>
+            <p style={{fontFamily:T.sans,fontSize:28,letterSpacing:"0.22em",color:T.white}}>{emb.cupom}</p>
           </div>
-          <p className="text-xs text-gray-400 mt-2 text-center">
-            {(CONFIG.COMISSAO_PCT * 100).toFixed(0)}% de desconto para quem usar · {(CONFIG.COMISSAO_PCT * 100).toFixed(0)}% de comissão para você
-          </p>
-        </Card>
-
-        {/* Tabs */}
-        <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100">
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${tab === t.id ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700"}`}>
-              {t.label}
-            </button>
-          ))}
+          <button onClick={()=>{navigator.clipboard.writeText(emb.cupom);alert("Cupom copiado!");}}
+            style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",background:"transparent",color:T.white,border:"1px solid rgba(255,255,255,0.4)",padding:"10px 20px",cursor:"pointer"}}>
+            Copiar
+          </button>
         </div>
 
-        {/* TAB: INÍCIO */}
-        {tab === "inicio" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Saldo disponível" value={formatBRL(saldoConfirmado)} sub="Pronto para resgatar" />
-              <StatCard label="Pendente" value={formatBRL(saldoPendente)} sub={`Aguardando ${CONFIG.JANELA_DEVOLUCAO_DIAS}d de prazo`} />
-              <StatCard label="Total em vendas" value={formatBRL(totalGerado)} sub={`${totalVendas} pedido(s)`} />
-              <StatCard label="Comissão total" value={formatBRL(comissoes.reduce((s,c)=>s+c.valor_comissao,0))} sub="Desde o início" />
-            </div>
+        {/* Stats */}
+        <StatGrid items={[[brl(saldoDisp),"Disponível para resgate"],[brl(saldoPend),"Pendente"],[brl(cs.reduce((s,c)=>s+c.valor_pedido,0)),"Total em vendas"],[brl(cs.reduce((s,c)=>s+c.valor_comissao,0)),"Comissão acumulada"]]} cols={4}/>
 
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm text-gray-700">Últimas vendas</h3>
-                <Button variant="ghost" onClick={sincronizarVendas} loading={sincronizando} className="text-xs">
-                  Sincronizar
-                </Button>
-              </div>
-              {comissoes.slice(0, 3).length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">Nenhuma venda registrada ainda.</p>
-              ) : comissoes.slice(0, 3).map(c => (
-                <div key={c.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Pedido #{c.pedido_id}</p>
-                    <p className="text-xs text-gray-400">{formatDate(c.criado_em)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">{formatBRL(c.valor_comissao)}</p>
-                    <Badge color={statusBadge[c.status]?.[0] || "gray"}>{statusBadge[c.status]?.[1] || c.status}</Badge>
-                  </div>
-                </div>
-              ))}
-              {comissoes.length > 3 && (
-                <button onClick={() => setTab("vendas")} className="text-xs text-gray-400 hover:text-gray-700 mt-2 w-full text-center">
-                  Ver todas ({comissoes.length})
-                </button>
-              )}
-            </Card>
+        {/* Tabs */}
+        <Tabs tabs={["inicio","vendas","resgatar"]} labels={{inicio:"Início",vendas:`Vendas (${cs.length})`,resgatar:"Resgatar"}} active={tab} onChange={setTab}/>
+
+        {/* TAB INÍCIO */}
+        {tab==="inicio" && (
+          <div className="fade-in">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase"}}>Últimas vendas</p>
+              <BtnGhost onClick={sincronizar}>{sync?<span style={{width:12,height:12,border:"1.5px solid #a0a0a0",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>:"Sincronizar"}</BtnGhost>
+            </div>
+            {cs.length===0
+              ? <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,paddingTop:16}}>Nenhuma venda registrada. Compartilhe seu cupom para começar.</p>
+              : cs.slice(0,5).map(c=>(
+                <Row key={c.id}
+                  left={<div><p style={{fontFamily:T.sans,fontSize:13}}>Pedido #{c.pedido_id}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{fmt(c.criado_em)}</p></div>}
+                  right={<div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>{brl(c.valor_comissao)}</p><Badge text={bStatus[c.status]?.[1]||c.status} color={bStatus[c.status]?.[0]||T.black}/></div>}
+                />
+              ))
+            }
+            {cs.length>5&&<BtnGhost onClick={()=>setTab("vendas")} style={{marginTop:16}}>Ver todas ({cs.length}) →</BtnGhost>}
           </div>
         )}
 
-        {/* TAB: VENDAS */}
-        {tab === "vendas" && (
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">Histórico de vendas</h3>
-              <Button variant="ghost" onClick={sincronizarVendas} loading={sincronizando} className="text-xs">
-                Sincronizar
-              </Button>
+        {/* TAB VENDAS */}
+        {tab==="vendas" && (
+          <div className="fade-in">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase"}}>Histórico completo</p>
+              <BtnGhost onClick={sincronizar}>{sync?<span style={{width:12,height:12,border:"1.5px solid #a0a0a0",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>:"Sincronizar"}</BtnGhost>
             </div>
-            {comissoes.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">Nenhuma venda registrada ainda.<br/>Compartilhe seu cupom para começar!</p>
-            ) : (
-              <div className="space-y-0">
-                {comissoes.map(c => (
-                  <div key={c.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Pedido #{c.pedido_id}</p>
-                      <p className="text-xs text-gray-400">{formatDate(c.criado_em)} · Pedido: {formatBRL(c.valor_pedido)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-gray-900">+{formatBRL(c.valor_comissao)}</p>
-                      <Badge color={statusBadge[c.status]?.[0] || "gray"}>{statusBadge[c.status]?.[1] || c.status}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+            {cs.length===0
+              ? <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,paddingTop:16}}>Nenhuma venda registrada ainda.</p>
+              : cs.map(c=>(
+                <Row key={c.id}
+                  left={<div><p style={{fontFamily:T.sans,fontSize:13}}>Pedido #{c.pedido_id}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{fmt(c.criado_em)} · Pedido: {brl(c.valor_pedido)}</p></div>}
+                  right={<div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>+{brl(c.valor_comissao)}</p><Badge text={bStatus[c.status]?.[1]||c.status} color={bStatus[c.status]?.[0]||T.black}/></div>}
+                />
+              ))
+            }
+          </div>
         )}
 
-        {/* TAB: RESGATAR */}
-        {tab === "resgatar" && (
-          <div className="space-y-4">
-            <Card>
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Saldo disponível para resgate</p>
-              <p className="text-3xl font-bold text-gray-900 mb-1">{formatBRL(saldoConfirmado)}</p>
-              {saldoPendente > 0 && (
-                <p className="text-xs text-yellow-600">{formatBRL(saldoPendente)} pendente (aguardando prazo de devolução)</p>
-              )}
-            </Card>
-
-            {saldoConfirmado > 0 && (
-              <Card>
-                <h3 className="font-semibold text-gray-900 mb-4">Solicitar resgate</h3>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Forma de resgate</p>
-                    <div className="flex gap-3">
-                      {[["credito", "Crédito na loja"], ["pix", "Pix"]].map(([val, lbl]) => (
-                        <button key={val} onClick={() => setFormResgate(f => ({ ...f, tipo: val }))}
-                          className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${formResgate.tipo === val ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}>
-                          {lbl}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {formResgate.tipo === "pix" && (
-                    <Input label="Chave Pix" value={formResgate.pix_key}
-                      onChange={e => setFormResgate(f => ({ ...f, pix_key: e.target.value }))}
-                      placeholder="CPF, e-mail, telefone ou chave aleatória" />
-                  )}
-
-                  <Alert message={msgResgate} type={msgResgate.includes("sucesso") ? "success" : "error"} />
-
-                  <Button onClick={solicitarResgate} loading={resgatando} className="w-full">
-                    Solicitar {formatBRL(saldoConfirmado)}
-                  </Button>
-                  <p className="text-xs text-gray-400 text-center">
-                    Resgates são processados em até 5 dias úteis.
-                  </p>
+        {/* TAB RESGATAR */}
+        {tab==="resgatar" && (
+          <div className="fade-in">
+            <div style={{marginBottom:40}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:8}}>Saldo disponível</p>
+              <p style={{fontFamily:T.serif,fontSize:64,fontWeight:300,lineHeight:1,marginBottom:4}}>{brl(saldoDisp)}</p>
+              {saldoPend>0&&<p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{brl(saldoPend)} pendente — aguardando prazo de devolução</p>}
+            </div>
+            {saldoDisp>0&&(
+              <div style={{maxWidth:400,marginBottom:48}}>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Forma de resgate</p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",border:`1px solid ${T.black}`,marginBottom:28}}>
+                  {[["credito","Crédito na loja"],["pix","Pix"]].map(([val,lbl],i)=>(
+                    <button key={val} onClick={()=>setFResgate(p=>({...p,tipo:val}))}
+                      style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px",border:"none",borderRight:i===0?`1px solid ${T.black}`:"none",cursor:"pointer",background:fResgate.tipo===val?T.black:T.white,color:fResgate.tipo===val?T.white:T.black,transition:"all 0.15s"}}>
+                      {lbl}
+                    </button>
+                  ))}
                 </div>
-              </Card>
+                {fResgate.tipo==="pix"&&<div style={{marginBottom:28}}><Input label="Chave Pix" value={fResgate.pix} onChange={e=>setFResgate(p=>({...p,pix:e.target.value}))} placeholder="CPF, e-mail, telefone ou chave aleatória"/></div>}
+                {msgR.text&&<div style={{marginBottom:24}}><Alert msg={msgR.text} ok={msgR.ok}/></div>}
+                <BtnPrimary onClick={resgatar} loading={resgatando}>Solicitar {brl(saldoDisp)}</BtnPrimary>
+                <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:12}}>Processado em até 5 dias úteis.</p>
+              </div>
             )}
-
-            {resgates.length > 0 && (
-              <Card>
-                <h3 className="font-semibold text-gray-900 mb-3">Histórico de resgates</h3>
-                {resgates.map(r => (
-                  <div key={r.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{r.tipo === "pix" ? "Pix" : "Crédito na loja"}</p>
-                      <p className="text-xs text-gray-400">{formatDate(r.criado_em)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-gray-900">{formatBRL(r.valor)}</p>
-                      <Badge color={resgatesBadge[r.status]?.[0] || "gray"}>{resgatesBadge[r.status]?.[1] || r.status}</Badge>
-                    </div>
-                  </div>
+            {rs.length>0&&(
+              <div>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>Histórico de resgates</p>
+                {rs.map(r=>(
+                  <Row key={r.id}
+                    left={<div><p style={{fontFamily:T.sans,fontSize:13}}>{r.tipo==="pix"?"Pix":"Crédito na loja"}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{fmt(r.criado_em)}</p></div>}
+                    right={<div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>{brl(r.valor)}</p><Badge text={bResgate[r.status]?.[1]||r.status} color={bResgate[r.status]?.[0]||T.black}/></div>}
+                  />
                 ))}
-              </Card>
+              </div>
             )}
           </div>
         )}
@@ -681,287 +504,143 @@ function PagePainel({ user, onLogout }) {
   );
 }
 
-// ── ADMIN
+// ── PAGE: ADMIN ───────────────────────────────────────────────────────────────
 function PageAdmin({ user, onLogout }) {
-  const [embaixadores, setEmbaixadores] = React.useState([]);
-  const [resgates, setResgates] = React.useState([]);
-  const [comunicacoes, setComunicacoes] = React.useState([]);
+  const [embs, setEmbs] = React.useState([]);
+  const [ress, setRess] = React.useState([]);
+  const [fila, setFila] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [tab, setTab] = React.useState("embaixadores");
   const [busca, setBusca] = React.useState("");
 
-  React.useEffect(() => { carregarDados(); }, []);
+  React.useEffect(()=>{load();},[]);
 
-  async function carregarDados() {
+  async function load() {
     setLoading(true);
-    const { data: embs } = await supabase.from("embaixadores").select("*, comissoes(valor_comissao, status, resgatada)").order("criado_em", { ascending: false });
-    setEmbaixadores(embs || []);
-
-    const { data: ress } = await supabase.from("resgates").select("*, embaixadores(nome, email, cupom)").eq("status", "solicitado").order("criado_em", { ascending: false });
-    setResgates(ress || []);
-
-    // Fila de comunicações: novos (últimas 24h) + inativos
-    const ontem = new Date(Date.now() - 86400000).toISOString();
-    const { data: novos } = await supabase.from("embaixadores").select("id, nome, whatsapp, cupom, criado_em").gte("criado_em", ontem);
-
-    const trintaDias = new Date(Date.now() - 30 * 86400000).toISOString();
-    const { data: inativos } = await supabase.from("embaixadores")
-      .select("id, nome, whatsapp, cupom, ultimo_acesso")
-      .lt("ultimo_acesso", trintaDias)
-      .eq("status", "ativo");
-
-    const fila = [
-      ...(novos || []).map(e => ({ ...e, motivo: "Novo cadastro — enviar boas-vindas", prioridade: "alta" })),
-      ...(inativos || []).map(e => ({ ...e, motivo: "Inativo há +30 dias — reengajar", prioridade: "media" })),
-    ];
-    setComunicacoes(fila);
+    const {data:e}=await supabase.from("embaixadores").select("*, comissoes(valor_comissao,status,resgatada)").order("criado_em",{ascending:false});
+    setEmbs(e||[]);
+    const {data:r}=await supabase.from("resgates").select("*, embaixadores(nome,email,cupom)").eq("status","solicitado").order("criado_em",{ascending:false});
+    setRess(r||[]);
+    const ontem=new Date(Date.now()-86400000).toISOString();
+    const {data:novos}=await supabase.from("embaixadores").select("id,nome,whatsapp,cupom,criado_em").gte("criado_em",ontem);
+    const t30=new Date(Date.now()-30*86400000).toISOString();
+    const {data:inat}=await supabase.from("embaixadores").select("id,nome,whatsapp,cupom,ultimo_acesso").lt("ultimo_acesso",t30).eq("status","ativo");
+    setFila([...(novos||[]).map(x=>({...x,motivo:"Novo cadastro — boas-vindas",p:"alta"})),...(inat||[]).map(x=>({...x,motivo:"Inativo +30d — reengajar",p:"media"}))]);
     setLoading(false);
   }
 
-  async function aprovarResgate(id, tipo) {
-    await supabase.from("resgates").update({ status: tipo === "credito" ? "aprovado" : "aprovado" }).eq("id", id);
-    await carregarDados();
-  }
+  async function aprovar(id){await supabase.from("resgates").update({status:"aprovado"}).eq("id",id);await load();}
+  async function recusar(id){await supabase.from("resgates").update({status:"recusado"}).eq("id",id);await load();}
+  async function feito(id){await supabase.from("embaixadores").update({ultimo_contato:new Date().toISOString()}).eq("id",id);setFila(f=>f.filter(x=>x.id!==id));}
 
-  async function recusarResgate(id) {
-    await supabase.from("resgates").update({ status: "recusado" }).eq("id", id);
-    await carregarDados();
-  }
+  if(loading) return <div style={{minHeight:"100vh"}}><Header user={user} onLogout={onLogout} isAdmin/><Spinner/></div>;
 
-  async function marcarComunicado(id) {
-    await supabase.from("embaixadores").update({ ultimo_contato: new Date().toISOString() }).eq("id", id);
-    setComunicacoes(c => c.filter(x => x.id !== id));
-  }
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
-
-  const embsFiltrados = embaixadores.filter(e =>
-    !busca || e.nome?.toLowerCase().includes(busca.toLowerCase()) || e.email?.toLowerCase().includes(busca.toLowerCase()) || e.cupom?.toLowerCase().includes(busca.toLowerCase())
-  );
-
-  const totalAtivos = embaixadores.filter(e => e.status === "ativo").length;
-  const totalResgatesPendentes = resgates.length;
-
-  const tabs = [
-    { id: "embaixadores", label: `Embaixadores (${embaixadores.length})` },
-    { id: "resgates", label: `Resgates${resgates.length > 0 ? ` (${resgates.length})` : ""}` },
-    { id: "comunicacoes", label: `Fila${comunicacoes.length > 0 ? ` (${comunicacoes.length})` : ""}` },
-  ];
+  const filtrados=embs.filter(e=>!busca||[e.nome,e.email,e.cupom].join(" ").toLowerCase().includes(busca.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div>
-            <Logo size="sm" />
-            <span className="text-xs bg-gray-900 text-white rounded-full px-2 py-0.5 ml-2 font-medium">Admin</span>
+    <div style={{minHeight:"100vh",background:T.white}}>
+      <Header user={user} onLogout={onLogout} isAdmin/>
+      <div style={{maxWidth:960,margin:"0 auto",padding:"48px 32px 80px"}} className="fade-in">
+
+        <div style={{marginBottom:40}}>
+          <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>Gestão</p>
+          <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300}}>Clientes Embaixadores</h2>
+        </div>
+
+        <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
+
+        <Tabs tabs={["embaixadores","resgates","fila"]} labels={{embaixadores:`Embaixadores (${embs.length})`,resgates:`Resgates${ress.length?` (${ress.length})`:""}`,fila:`Fila${fila.length?` (${fila.length})`:""}`}} active={tab} onChange={setTab}/>
+
+        {/* TAB EMBAIXADORES */}
+        {tab==="embaixadores"&&(
+          <div className="fade-in">
+            <div style={{marginBottom:24}}><Input label="Buscar" value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Nome, e-mail ou cupom"/></div>
+            {filtrados.length===0?<p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhum resultado.</p>
+            :filtrados.map(e=>{
+              const total=(e.comissoes||[]).reduce((s,c)=>s+(c.valor_comissao||0),0);
+              const saldo=(e.comissoes||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+c.valor_comissao,0);
+              return(
+                <Row key={e.id}
+                  left={<div><p style={{fontFamily:T.sans,fontSize:13,marginBottom:2}}>{e.nome}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{e.email} · {e.whatsapp}</p><span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",background:T.g100,padding:"2px 8px",display:"inline-block",marginTop:4}}>{e.cupom}</span></div>}
+                  right={<div style={{textAlign:"right"}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>{brl(total)}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>total · {brl(saldo)} disponível</p></div>}
+                />
+              );
+            })}
           </div>
-          <button onClick={onLogout} className="text-xs text-gray-400 hover:text-gray-700">Sair</button>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto p-4 space-y-4 fade-in">
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <StatCard label="Embaixadores ativos" value={totalAtivos} />
-          <StatCard label="Resgates pendentes" value={totalResgatesPendentes} />
-          <StatCard label="Fila de contato" value={comunicacoes.length} />
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100">
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all ${tab === t.id ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700"}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* TAB: EMBAIXADORES */}
-        {tab === "embaixadores" && (
-          <Card>
-            <div className="mb-4">
-              <Input placeholder="Buscar por nome, e-mail ou cupom..." value={busca} onChange={e => setBusca(e.target.value)} />
-            </div>
-            {embsFiltrados.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">Nenhum embaixador encontrado.</p>
-            ) : (
-              <div className="space-y-0">
-                {embsFiltrados.map(e => {
-                  const totalComissao = (e.comissoes || []).reduce((s, c) => s + (c.valor_comissao || 0), 0);
-                  const saldo = (e.comissoes || []).filter(c => c.status === "confirmada" && !c.resgatada).reduce((s, c) => s + c.valor_comissao, 0);
-                  return (
-                    <div key={e.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{e.nome}</p>
-                        <p className="text-xs text-gray-400">{e.email} · {e.whatsapp}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">{e.cupom}</span>
-                          <Badge color={e.status === "ativo" ? "green" : "gray"}>{e.status}</Badge>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900">{formatBRL(totalComissao)}</p>
-                        <p className="text-xs text-gray-400">total gerado</p>
-                        <p className="text-xs text-green-600 font-medium">{formatBRL(saldo)} disponível</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
         )}
 
-        {/* TAB: RESGATES */}
-        {tab === "resgates" && (
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">Resgates solicitados</h3>
-            {resgates.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">Nenhum resgate pendente.</p>
-            ) : (
-              <div className="space-y-4">
-                {resgates.map(r => (
-                  <div key={r.id} className="border border-gray-100 rounded-xl p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="font-semibold text-gray-900">{r.embaixadores?.nome}</p>
-                        <p className="text-xs text-gray-400">{r.embaixadores?.email}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">Solicitado em {formatDate(r.criado_em)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-gray-900">{formatBRL(r.valor)}</p>
-                        <Badge color="yellow">{r.tipo === "pix" ? "Pix" : "Crédito"}</Badge>
-                      </div>
-                    </div>
-                    {r.tipo === "pix" && r.pix_key && (
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 mb-3">
-                        <p className="text-xs text-gray-400 mb-0.5">Chave Pix</p>
-                        <p className="text-sm font-mono text-gray-900">{r.pix_key}</p>
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <Button onClick={() => aprovarResgate(r.id, r.tipo)} variant="primary" className="flex-1">
-                        ✓ Aprovar
-                      </Button>
-                      <Button onClick={() => recusarResgate(r.id)} variant="danger" className="flex-1">
-                        ✗ Recusar
-                      </Button>
+        {/* TAB RESGATES */}
+        {tab==="resgates"&&(
+          <div className="fade-in">
+            {ress.length===0?<p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhum resgate pendente.</p>
+            :ress.map(r=>(
+              <div key={r.id} style={{borderBottom:`1px solid ${T.g200}`,padding:"24px 0"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div>
+                    <p style={{fontFamily:T.sans,fontSize:13,marginBottom:2}}>{r.embaixadores?.nome}</p>
+                    <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{r.embaixadores?.email}</p>
+                    <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>Solicitado em {fmt(r.criado_em)}</p>
+                    {r.tipo==="pix"&&r.pix_key&&<p style={{fontFamily:T.sans,fontSize:12,background:T.g100,padding:"4px 10px",display:"inline-block",marginTop:8,letterSpacing:"0.05em"}}>Pix: {r.pix_key}</p>}
+                  </div>
+                  <div style={{textAlign:"right",marginLeft:32}}>
+                    <p style={{fontFamily:T.serif,fontSize:32,fontWeight:300,marginBottom:8}}>{brl(r.valor)}</p>
+                    <Badge text={r.tipo==="pix"?"Pix":"Crédito"}/>
+                    <div style={{display:"flex",gap:8,marginTop:12,justifyContent:"flex-end"}}>
+                      <BtnPrimary onClick={()=>aprovar(r.id)} style={{width:"auto",padding:"10px 20px",fontSize:10}}>Aprovar</BtnPrimary>
+                      <BtnSecondary onClick={()=>recusar(r.id)} style={{padding:"10px 20px",fontSize:10}}>Recusar</BtnSecondary>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
-            )}
-          </Card>
+            ))}
+          </div>
         )}
 
-        {/* TAB: FILA DE COMUNICAÇÕES */}
-        {tab === "comunicacoes" && (
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">Fila de comunicações manuais</h3>
-              <p className="text-xs text-gray-400">Enviar via WhatsApp</p>
-            </div>
-            {comunicacoes.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">Nenhuma comunicação pendente. 🎉</p>
-            ) : (
-              <div className="space-y-3">
-                {comunicacoes.map(c => (
-                  <div key={c.id} className="flex items-center justify-between border border-gray-100 rounded-xl p-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-semibold text-gray-900">{c.nome}</p>
-                        <Badge color={c.prioridade === "alta" ? "red" : "yellow"}>
-                          {c.prioridade === "alta" ? "Novo" : "Inativo"}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-gray-400">{c.whatsapp}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{c.motivo}</p>
-                    </div>
-                    <div className="flex flex-col gap-1.5 ml-3">
-                      <a href={`https://wa.me/55${c.whatsapp?.replace(/\D/g, "")}?text=Oi ${c.nome?.split(" ")[0]}!`}
-                        target="_blank" rel="noopener noreferrer">
-                        <Button variant="secondary" className="text-xs whitespace-nowrap">Abrir WA</Button>
-                      </a>
-                      <Button variant="ghost" onClick={() => marcarComunicado(c.id)} className="text-xs whitespace-nowrap">
-                        Feito ✓
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+        {/* TAB FILA */}
+        {tab==="fila"&&(
+          <div className="fade-in">
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:24}}>Envio manual via WhatsApp</p>
+            {fila.length===0?<p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhuma comunicação pendente.</p>
+            :fila.map(c=>(
+              <Row key={c.id}
+                left={<div><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}><p style={{fontFamily:T.sans,fontSize:13}}>{c.nome}</p><Badge text={c.p==="alta"?"Novo":"Inativo"} color={c.p==="alta"?T.black:T.g400}/></div><p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{c.whatsapp}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g500,marginTop:2}}>{c.motivo}</p></div>}
+                right={<div style={{display:"flex",gap:8,marginLeft:16,flexShrink:0}}>
+                  <a href={`https://wa.me/55${(c.whatsapp||"").replace(/\D/g,"")}?text=Oi ${(c.nome||"").split(" ")[0]}!`} target="_blank" rel="noopener noreferrer"><BtnSecondary style={{padding:"10px 16px",fontSize:10}}>Abrir WA</BtnSecondary></a>
+                  <BtnGhost onClick={()=>feito(c.id)} style={{fontSize:10}}>Feito ✓</BtnGhost>
+                </div>}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────
-// APP ROOT — roteamento simples por hash
-// ─────────────────────────────────────────
+// ── APP ───────────────────────────────────────────────────────────────────────
 function App() {
-  const [page, setPage] = React.useState(() => window.location.hash.replace("#","") || "cadastro");
+  const [page, setPage] = React.useState(()=>window.location.hash.replace("#","")||"cadastro");
   const [user, setUser] = React.useState(null);
-  const [checkingAuth, setCheckingAuth] = React.useState(true);
+  const [checking, setChecking] = React.useState(true);
 
-  React.useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user || null);
-      setCheckingAuth(false);
-    });
-    supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user || null);
-    });
-  }, []);
+  React.useEffect(()=>{
+    supabase.auth.getSession().then(({data})=>{setUser(data.session?.user||null);setChecking(false);});
+    supabase.auth.onAuthStateChange((_,s)=>setUser(s?.user||null));
+  },[]);
+  React.useEffect(()=>{window.location.hash=page;},[page]);
 
-  React.useEffect(() => {
-    window.location.hash = page;
-  }, [page]);
+  function handleLogin(u){setUser(u);setPage(CONFIG.ADMIN_EMAILS.includes(u.email)?"admin":"painel");}
+  async function handleLogout(){await supabase.auth.signOut();setUser(null);setPage("login");}
 
-  function navigate(p) { setPage(p); }
-
-  function handleLogin(u) {
-    setUser(u);
-    // Admin: defina aqui os e-mails com acesso admin
-    const ADMINS = ["admin@saintgermain.com.br"];
-    setPage(ADMINS.includes(u.email) ? "admin" : "painel");
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    setUser(null);
-    setPage("login");
-  }
-
-  if (checkingAuth) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
-
-  if (page === "cadastro") return <PageCadastro onNavigate={navigate} />;
-  if (page === "login") return <PageLogin onLogin={handleLogin} onNavigate={navigate} />;
-  if (page === "painel") {
-    if (!user) return <PageLogin onLogin={handleLogin} onNavigate={navigate} />;
-    return <PagePainel user={user} onLogout={handleLogout} />;
-  }
-  if (page === "admin") {
-    if (!user) return <PageLogin onLogin={handleLogin} onNavigate={navigate} />;
-    return <PageAdmin user={user} onLogout={handleLogout} />;
-  }
-
-  return <PageCadastro onNavigate={navigate} />;
+  if(checking) return <Spinner/>;
+  if(page==="cadastro") return <PageCadastro onNavigate={setPage}/>;
+  if(page==="login") return <PageLogin onLogin={handleLogin} onNavigate={setPage}/>;
+  if(page==="painel") return user?<PagePainel user={user} onLogout={handleLogout}/>:<PageLogin onLogin={handleLogin} onNavigate={setPage}/>;
+  if(page==="admin") return user?<PageAdmin user={user} onLogout={handleLogout}/>:<PageLogin onLogin={handleLogin} onNavigate={setPage}/>;
+  return <PageCadastro onNavigate={setPage}/>;
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
