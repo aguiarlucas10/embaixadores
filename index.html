@@ -47,7 +47,6 @@ const CONFIG = {
   SUPABASE_ANON_KEY:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnFuc2hrZnduZmVzd3dkbXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MzcxNDAsImV4cCI6MjA4ODMxMzE0MH0.XO5JpNdnu03tRLGUsisi3I_lTZHcMwhJMlw9VBrXkK8",
   NUVEMSHOP_USER_ID:   "1116055",
   NUVEMSHOP_TOKEN:     "803dbce287de76eb31d88c26c30e60c72126bb22",
-
   COMISSAO_PCT:        0.15,
   JANELA_DEVOLUCAO:    7,
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
@@ -871,7 +870,8 @@ function PageAdmin({ user, onLogout }) {
         new Date(e.criado_em).toLocaleDateString("pt-BR")
       ];
     });
-    const csv = [header, ...rows].map(r => r.map(v=>`"${String(v||"").replace(/"/g,'""')}"`).join(",")).join("
+        const esc = function(v){ return '"' + String(v||"").split('"').join('""')+'"'; };
+    const csv = [header, ...rows].map(function(r){ return r.map(esc).join(","); }).join("\n");
 ");
     const blob = new Blob(["﻿"+csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
