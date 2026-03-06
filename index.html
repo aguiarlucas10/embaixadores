@@ -1110,10 +1110,11 @@ function PageAdmin({ user, onLogout }) {
               {msgGrupo.text&&<div style={{marginTop:12}}><Alert msg={msgGrupo.text} ok={msgGrupo.ok}/></div>}
             </div>
           </div>
-    
+        </div>
+      )}
+
     {tab==="whatsapp" && (
       <PageWhatsApp embs={embs} />
-    )}
     )}
 
       </div>
