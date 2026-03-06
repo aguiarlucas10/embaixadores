@@ -76,6 +76,7 @@ const CONFIG = {
   META_WABA_ID:        "817641661012868",
   META_TOKEN:          "EAA8IELAR7LUBQZCyoFgZAiDZACKp7BrtjiGnsDjMw5p47HWIXGHdoCwtS5sRcwIwuHKkC8OEadZCIe6QpxJOge3K1vnmZAccsps7ecpZBMYDacAbBZB58r2YJ7lxTwRZCUYmdUgxdnL713pFQletudsCAybPCs2NvAI7zXXLO4UZARhZAr3BqayiZBxl0s70TbCI4hZCbqZB75Mp0tCOtmG1Dpl453Vc43n9bmGlodG0wjVrebnRK2aS1VJCGwIZBSs4dMoZA76UmDQpEVRVjoxlLljMPvm4QdZB",
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
+
 };
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -339,8 +340,19 @@ function PageCadastro({ onNavigate }) {
     if (!aceite) { setErr("Aceite os termos para continuar."); return; }
     setLoading(true);
     try {
-      const {data:ex} = await supabase.from("embaixadores").select("id").eq("email",f.email).maybeSingle();
+      const {data:ex} = await supabase.from("embaixadores").select("id,cupom").eq("email",f.email).maybeSingle();
       if (ex) { setErr("Este e-mail já está cadastrado. Acesse seu painel pelo login."); setLoading(false); return; }
+      // Verifica cupons existentes na Nuvemshop antes de sugerir opções
+      const opcoesTentativas = gerarOpcoes(f.nome);
+      for (const cod of opcoesTentativas) {
+        const chk = await fetch(CONFIG.EDGE_URL + "?action=check_coupon&code=" + encodeURIComponent(cod));
+        const chkJson = await chk.json();
+        if (chkJson.exists) {
+          setErr("Já existe um cupom cadastrado para esse perfil. Entre em contato com a Saint Germain.");
+          setLoading(false);
+          return;
+        }
+      }
       const pedidos = await NS.ordersByEmail(f.email);
       // Nuvemshop statuses: paid, pending, authorized, voided, refunded, abandoned
       const statusValidos = ["paid", "authorized", "pending"];
