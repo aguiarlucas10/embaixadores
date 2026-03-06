@@ -69,8 +69,12 @@ const CONFIG = {
   SUPABASE_ANON_KEY:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnFuc2hrZnduZmVzd3dkbXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MzcxNDAsImV4cCI6MjA4ODMxMzE0MH0.XO5JpNdnu03tRLGUsisi3I_lTZHcMwhJMlw9VBrXkK8",
   NUVEMSHOP_USER_ID:   "1116055",
   NUVEMSHOP_TOKEN:     "803dbce287de76eb31d88c26c30e60c72126bb22",
-  COMISSAO_PCT:        0.15,
+
+  COMISSAO_PCT:        0.10,
   JANELA_DEVOLUCAO:    7,
+  META_PHONE_ID:       "889366297587050",
+  META_WABA_ID:        "817641661012868",
+  META_TOKEN:          "EAA8IELAR7LUBQZCyoFgZAiDZACKp7BrtjiGnsDjMw5p47HWIXGHdoCwtS5sRcwIwuHKkC8OEadZCIe6QpxJOge3K1vnmZAccsps7ecpZBMYDacAbBZB58r2YJ7lxTwRZCUYmdUgxdnL713pFQletudsCAybPCs2NvAI7zXXLO4UZARhZAr3BqayiZBxl0s70TbCI4hZCbqZB75Mp0tCOtmG1Dpl453Vc43n9bmGlodG0wjVrebnRK2aS1VJCGwIZBSs4dMoZA76UmDQpEVRVjoxlLljMPvm4QdZB",
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
 };
 
@@ -953,7 +957,7 @@ function PageAdmin({ user, onLogout }) {
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
 
-        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner"]} labels={{embaixadores:`Embaixadores (${embs.length})`,resgates:`Resgates${ress.length?` (${ress.length})`:""}`,fila:`Fila${fila.length?` (${fila.length})`:""}`,"ranking":"🏆 Ranking","banner":"🖼 Banner"}} active={tab} onChange={setTab}/>
+        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp"]} labels={{embaixadores:`Embaixadores (${embs.length})`,resgates:`Resgates${ress.length?` (${ress.length})`:""}`,fila:`Fila${fila.length?` (${fila.length})`:""}`,"ranking":"🏆 Ranking","banner":"🖼 Banner"}} active={tab} onChange={setTab}/>
 
         {/* TAB EMBAIXADORES */}
         {tab==="embaixadores"&&(
@@ -1106,12 +1110,245 @@ function PageAdmin({ user, onLogout }) {
               {msgGrupo.text&&<div style={{marginTop:12}}><Alert msg={msgGrupo.text} ok={msgGrupo.ok}/></div>}
             </div>
           </div>
-        )}
+    
+    {tab==="whatsapp" && (
+      <PageWhatsApp embs={embs} />
+    )}
+    )}
 
       </div>
     </div>
   );
 }
+
+// ── WHATSAPP PAGE ────────────────────────────────────────────────────────────
+function PageWhatsApp({ embs }) {
+  const [templates, setTemplates] = React.useState([]);
+  const [loadingTpl, setLoadingTpl] = React.useState(false);
+  const [tplError, setTplError] = React.useState("");
+  const [selectedTpl, setSelectedTpl] = React.useState(null);
+  const [destino, setDestino] = React.useState("todos");
+  const [embSel, setEmbSel] = React.useState([]);
+  const [sending, setSending] = React.useState(false);
+  const [sendLog, setSendLog] = React.useState([]);
+  const [automacoes, setAutomacoes] = React.useState({
+    novo_cadastro: { ativo: false, template: "" },
+    marco_atingido: { ativo: false, template: "" },
+    resgate_solicitado: { ativo: false, template: "" },
+    inativo_30d: { ativo: false, template: "" },
+  });
+  const [savingAuto, setSavingAuto] = React.useState(false);
+  const [msgAuto, setMsgAuto] = React.useState("");
+
+  const autoLabels = {
+    novo_cadastro: "Novo cadastro aprovado",
+    marco_atingido: "Marco de vendas atingido",
+    resgate_solicitado: "Resgate solicitado",
+    inativo_30d: "Embaixador inativo há 30 dias",
+  };
+
+  React.useEffect(function() {
+    carregarTemplates();
+    carregarAutomacoes();
+  }, []);
+
+  async function carregarTemplates() {
+    setLoadingTpl(true); setTplError("");
+    try {
+      const res = await fetch(
+        "https://graph.facebook.com/v19.0/" + CONFIG.META_WABA_ID + "/message_templates?fields=name,status,language,components&limit=50",
+        { headers: { Authorization: "Bearer " + CONFIG.META_TOKEN } }
+      );
+      const data = await res.json();
+      if(data.error) { setTplError(data.error.message); setLoadingTpl(false); return; }
+      const aprovados = (data.data || []).filter(function(t) { return t.status === "APPROVED"; });
+      setTemplates(aprovados);
+    } catch(e) { setTplError("Erro ao carregar templates: " + e.message); }
+    setLoadingTpl(false);
+  }
+
+  async function carregarAutomacoes() {
+    const { data } = await supabase.from("config").select("*").eq("chave","whatsapp_automacoes").maybeSingle();
+    if(data?.valor) { try { setAutomacoes(JSON.parse(data.valor)); } catch(e){} }
+  }
+
+  async function salvarAutomacoes() {
+    setSavingAuto(true); setMsgAuto("");
+    await supabase.from("config").upsert({chave:"whatsapp_automacoes", valor: JSON.stringify(automacoes)},{onConflict:"chave"});
+    setSavingAuto(false); setMsgAuto("Automações salvas!");
+    setTimeout(function(){ setMsgAuto(""); }, 3000);
+  }
+
+  function tplPreview(tpl) {
+    if(!tpl) return "";
+    const body = (tpl.components || []).find(function(c){ return c.type === "BODY"; });
+    return body ? body.text : "(sem preview)";
+  }
+
+  function destinatarios() {
+    if(destino === "todos") return embs.filter(function(e){ return e.status === "ativo"; });
+    if(destino === "destaque") return embs.filter(function(e){ return e.nivel === "destaque" || e.nivel === "influenciador"; });
+    if(destino === "selecao") return embs.filter(function(e){ return embSel.includes(e.id); });
+    return [];
+  }
+
+  async function disparar() {
+    if(!selectedTpl) { alert("Selecione um template."); return; }
+    const lista = destinatarios();
+    if(!lista.length) { alert("Nenhum destinatário selecionado."); return; }
+    if(!confirm("Disparar para " + lista.length + " embaixadores?")) return;
+    setSending(true); setSendLog([]);
+    for(const emb of lista) {
+      const fone = String(emb.whatsapp || "").replace(/\D/g,"");
+      if(!fone) { setSendLog(function(l){ return [...l, {nome:emb.nome,ok:false,msg:"Sem WhatsApp"}]; }); continue; }
+      try {
+        const res = await fetch(
+          "https://graph.facebook.com/v19.0/" + CONFIG.META_PHONE_ID + "/messages",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + CONFIG.META_TOKEN },
+            body: JSON.stringify({
+              messaging_product: "whatsapp",
+              to: fone.startsWith("55") ? fone : "55" + fone,
+              type: "template",
+              template: { name: selectedTpl.name, language: { code: selectedTpl.language } }
+            })
+          }
+        );
+        const data = await res.json();
+        if(data.error) throw new Error(data.error.message);
+        setSendLog(function(l){ return [...l, {nome:emb.nome,ok:true,msg:"Enviado"}]; });
+      } catch(e) {
+        setSendLog(function(l){ return [...l, {nome:emb.nome,ok:false,msg:e.message}]; });
+      }
+      await new Promise(function(r){ setTimeout(r, 200); }); // rate limit
+    }
+    setSending(false);
+  }
+
+  return (
+    <div className="fade-in" style={{maxWidth:640}}>
+      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",color:T.g400,textTransform:"uppercase",marginBottom:4}}>WhatsApp Business API</p>
+      <h2 style={{fontFamily:T.serif,fontSize:32,fontWeight:300,marginBottom:32}}>Disparos</h2>
+
+      {/* ── DISPARO MANUAL ── */}
+      <div style={{marginBottom:48}}>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",fontWeight:600,marginBottom:20}}>Disparo Manual</p>
+
+        {/* Templates */}
+        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:T.g400,textTransform:"uppercase",marginBottom:8}}>Template aprovado</p>
+        {loadingTpl && <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Carregando templates...</p>}
+        {tplError && <p style={{fontFamily:T.sans,fontSize:13,color:"#c00"}}>{tplError}</p>}
+        {!loadingTpl && !tplError && (
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+            {templates.length === 0 && <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhum template aprovado encontrado.</p>}
+            {templates.map(function(t) {
+              const sel = selectedTpl?.name === t.name;
+              return (
+                <div key={t.name} onClick={function(){ setSelectedTpl(t); }}
+                  style={{border:"1px solid " + (sel ? T.black : T.g200),padding:"12px 16px",cursor:"pointer",borderRadius:2,background:sel?T.black:T.white}}>
+                  <p style={{fontFamily:T.sans,fontSize:12,fontWeight:600,color:sel?T.white:T.black,marginBottom:4}}>{t.name}</p>
+                  <p style={{fontFamily:T.sans,fontSize:11,color:sel?"#ccc":T.g400,lineHeight:1.5}}>{tplPreview(t).substring(0,120)}{tplPreview(t).length>120?"...":""}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Destinatários */}
+        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:T.g400,textTransform:"uppercase",marginBottom:8}}>Destinatários</p>
+        <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {[["todos","Todos ativos"],["destaque","Destaque e Influenciadores"],["selecao","Seleção manual"]].map(function([v,l]){
+            return (
+              <button key={v} onClick={function(){ setDestino(v); }}
+                style={{fontFamily:T.sans,fontSize:11,padding:"8px 16px",border:"1px solid "+(destino===v?T.black:T.g200),background:destino===v?T.black:T.white,color:destino===v?T.white:T.black,cursor:"pointer",letterSpacing:"0.08em",textTransform:"uppercase"}}>
+                {l}
+              </button>
+            );
+          })}
+        </div>
+
+        {destino === "selecao" && (
+          <div style={{border:"1px solid "+T.g200,padding:16,marginBottom:16,maxHeight:200,overflowY:"auto"}}>
+            {embs.filter(function(e){ return e.status==="ativo"; }).map(function(e){
+              const checked = embSel.includes(e.id);
+              return (
+                <div key={e.id} onClick={function(){ setEmbSel(function(s){ return checked?s.filter(function(x){return x!==e.id;}):[...s,e.id]; }); }}
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",cursor:"pointer",borderBottom:"1px solid "+T.g200}}>
+                  <div style={{width:16,height:16,border:"1px solid "+(checked?T.black:T.g300),background:checked?T.black:"transparent",flexShrink:0}}/>
+                  <span style={{fontFamily:T.sans,fontSize:12}}>{e.nome}</span>
+                  <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:"auto"}}>{e.cupom}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:24}}>
+          <button onClick={disparar} disabled={sending}
+            style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 32px",background:sending?T.g200:T.black,color:T.white,border:"none",cursor:sending?"not-allowed":"pointer"}}>
+            {sending ? "Enviando..." : "Disparar agora"}
+          </button>
+          <span style={{fontFamily:T.sans,fontSize:12,color:T.g400}}>
+            {destinatarios().length} destinatário{destinatarios().length!==1?"s":""}
+          </span>
+        </div>
+
+        {/* Log */}
+        {sendLog.length > 0 && (
+          <div style={{border:"1px solid "+T.g200,padding:16,maxHeight:200,overflowY:"auto"}}>
+            {sendLog.map(function(l,i){
+              return (
+                <div key={i} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:"1px solid "+T.g200,fontFamily:T.sans,fontSize:12}}>
+                  <span style={{color:l.ok?"#2a7a2a":"#c00",fontWeight:600}}>{l.ok?"✓":"✗"}</span>
+                  <span style={{flex:1}}>{l.nome}</span>
+                  <span style={{color:T.g400}}>{l.msg}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── AUTOMAÇÕES ── */}
+      <div style={{borderTop:"1px solid "+T.g200,paddingTop:32}}>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",fontWeight:600,marginBottom:20}}>Automações</p>
+        <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,marginBottom:24,lineHeight:1.6}}>Configure qual template é enviado automaticamente em cada evento. As mensagens são disparadas via Edge Function do Supabase.</p>
+
+        {Object.keys(automacoes).map(function(key) {
+          const auto = automacoes[key];
+          return (
+            <div key={key} style={{borderBottom:"1px solid "+T.g200,padding:"20px 0"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                <p style={{fontFamily:T.sans,fontSize:13,fontWeight:600}}>{autoLabels[key]}</p>
+                <div onClick={function(){ setAutomacoes(function(a){ return {...a,[key]:{...a[key],ativo:!a[key].ativo}}; }); }}
+                  style={{width:40,height:22,background:auto.ativo?T.black:T.g200,borderRadius:11,cursor:"pointer",position:"relative",transition:"background 0.2s"}}>
+                  <div style={{position:"absolute",top:3,left:auto.ativo?20:3,width:16,height:16,background:T.white,borderRadius:"50%",transition:"left 0.2s"}}/>
+                </div>
+              </div>
+              {auto.ativo && (
+                <select value={auto.template} onChange={function(e){ const v=e.target.value; setAutomacoes(function(a){ return {...a,[key]:{...a[key],template:v}}; }); }}
+                  style={{fontFamily:T.sans,fontSize:12,padding:"8px 12px",border:"1px solid "+T.g200,background:T.white,width:"100%",color:auto.template?T.black:T.g400}}>
+                  <option value="">Selecionar template...</option>
+                  {templates.map(function(t){ return <option key={t.name} value={t.name}>{t.name}</option>; })}
+                </select>
+              )}
+            </div>
+          );
+        })}
+
+        <div style={{display:"flex",alignItems:"center",gap:16,marginTop:24}}>
+          <button onClick={salvarAutomacoes} disabled={savingAuto}
+            style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 32px",background:savingAuto?T.g200:T.black,color:T.white,border:"none",cursor:"pointer"}}>
+            {savingAuto ? "Salvando..." : "Salvar automações"}
+          </button>
+          {msgAuto && <p style={{fontFamily:T.sans,fontSize:13,color:"#2a7a2a"}}>{msgAuto}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ── APP ───────────────────────────────────────────────────────────────────────
 function App() {
