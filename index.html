@@ -576,6 +576,14 @@ function PagePainel({ user, onLogout }) {
     if(!emb) return; setSync(true);
     const pedidos = await NS.ordersByCoupon(emb.cupom);
     for(const p of (pedidos||[])){
+      // Valida que o pedido realmente usou este cupom
+      const cupons = (p.coupon || []);
+      const usouCupom = cupons.some(function(c) {
+        return String(c.code||"").toUpperCase() === String(emb.cupom).toUpperCase();
+      });
+      if(!usouCupom) continue;
+      // Valida status do pagamento
+      if(p.payment_status === "voided" || p.payment_status === "refunded") continue;
       const {data:ex} = await supabase.from("comissoes").select("id").eq("pedido_id",String(p.id)).maybeSingle();
       if(ex) continue;
       const val = parseFloat(p.total);
