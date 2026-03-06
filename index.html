@@ -229,11 +229,11 @@ function PageCadastro({ onNavigate }) {
     try {
       const {data:ex} = await supabase.from("embaixadores").select("id").eq("email",f.email).single();
       if (ex) { setErr("Este e-mail já está cadastrado."); setLoading(false); return; }
-      const pedidos = await NS.ordersByEmail(f.email);
-      if (!pedidos||!pedidos.length) { setErr("Não encontramos compras associadas a este e-mail. É necessário ter ao menos uma compra na Saint Germain para participar."); setLoading(false); return; }
-      const cod = gerarCupom(f.nome);
-      const criado = await NS.createCoupon(cod);
-      if (!criado) { setErr("Erro ao criar cupom. Tente novamente."); setLoading(false); return; }
+    //  const pedidos = await NS.ordersByEmail(f.email);
+    //  if (!pedidos||!pedidos.length) { setErr("Não encontramos compras associadas a este e-mail. É necessário ter ao menos uma compra na Saint Germain para participar."); setLoading(false); return; }
+    //  const cod = gerarCupom(f.nome);
+    //  const criado = await NS.createCoupon(cod);
+    //  if (!criado) { setErr("Erro ao criar cupom. Tente novamente."); setLoading(false); return; }
       const {error:dbErr} = await supabase.from("embaixadores").insert({nome:f.nome,email:f.email,cpf:f.cpf,whatsapp:f.whatsapp,instagram:f.instagram,tiktok:f.tiktok,cupom:cod,status:"ativo",nivel:"embaixador",comissao_pct:CONFIG.COMISSAO_PCT,aceite_termos_em:new Date().toISOString(),criado_em:new Date().toISOString()});
       if (dbErr) { setErr("Erro ao salvar. Tente novamente."); setLoading(false); return; }
       setCupom(cod); setOk(true);
