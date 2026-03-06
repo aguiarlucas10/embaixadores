@@ -860,24 +860,32 @@ function PageAdmin({ user, onLogout }) {
   }
 
   function exportarCSV() {
-    const header = ["Nome","Email","WhatsApp","Instagram","TikTok","Cupom","Status","Nível","Vendas Confirmadas","Comissão Total","Pix","Cadastro"];
-    const rows = embs.map(e => {
-      const totalVendas = 0; // sem join de comissoes no admin load — exporta dados do embaixador
-      return [
-        e.nome, e.email, e.whatsapp, e.instagram||"", e.tiktok||"",
-        e.cupom, e.status, e.nivel||"embaixador",
-        "", "", e.pix_key||"",
+    const cols = ["Nome","Email","WhatsApp","Instagram","TikTok","Cupom","Status","Nivel","Pix","Cadastro"];
+    const lines = [cols.join(",")];
+    embs.forEach(function(e) {
+      const vals = [
+        e.nome, e.email, e.whatsapp,
+        e.instagram || "", e.tiktok || "",
+        e.cupom, e.status, e.nivel || "embaixador",
+        e.pix_key || "",
         new Date(e.criado_em).toLocaleDateString("pt-BR")
       ];
+      const row = vals.map(function(v) {
+        const s = String(v || "").replace(/"/g, "");
+        return s;
+      });
+      lines.push(row.join(","));
     });
-        const esc = function(v){ return '"' + String(v||"").split('"').join('""')+'"'; };
-    const csv = [header, ...rows].map(function(r){ return r.map(esc).join(","); }).join("\n");
-");
-    const blob = new Blob(["﻿"+csv], {type:"text/csv;charset=utf-8;"});
+    const csv = lines.join("\n");
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href=url; a.download="embaixadores_sg.csv"; a.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "embaixadores_sg.csv";
+    a.click();
     URL.revokeObjectURL(url);
   }
+
 
   async function salvarGrupoLink() {
     setSalvandoGrupo(true); setMsgGrupo({text:"",ok:false});
