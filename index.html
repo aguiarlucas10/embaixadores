@@ -957,7 +957,7 @@ function PageAdmin({ user, onLogout }) {
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
 
-        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp"]} labels={{embaixadores:`Embaixadores (${embs.length})`,resgates:`Resgates${ress.length?` (${ress.length})`:""}`,fila:`Fila${fila.length?` (${fila.length})`:""}`,"ranking":"🏆 Ranking","banner":"🖼 Banner"}} active={tab} onChange={setTab}/>
+        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp"]} labels={{embaixadores:`Embaixadores (${embs.length})`,resgates:`Resgates${ress.length?` (${ress.length})`:""}`,fila:`Fila${fila.length?` (${fila.length})`:""}`,"ranking":"🏆 Ranking","banner":"🖼 Banner","whatsapp":"📱 WhatsApp"}} active={tab} onChange={setTab}/>
 
         {/* TAB EMBAIXADORES */}
         {tab==="embaixadores"&&(
@@ -1113,9 +1113,9 @@ function PageAdmin({ user, onLogout }) {
         </div>
       )}
 
-    {tab==="whatsapp" && (
-      <PageWhatsApp embs={embs} />
-    )}
+        {tab==="whatsapp" && (
+          <PageWhatsApp embs={embs} />
+        )}
 
       </div>
     </div>
