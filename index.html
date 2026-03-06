@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Clientes Embaixadores — Saint Germain</title>
+  <title>Embaixadores — Saint Germain</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -96,7 +96,7 @@ function Logo({ sub=true }) {
   return (
     <div>
       <div style={{fontFamily:T.sans,fontSize:13,letterSpacing:"0.25em",textTransform:"uppercase",color:T.black}}>Saint Germain</div>
-      {sub && <div style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginTop:1}}>Clientes Embaixadores</div>}
+      {sub && <div style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginTop:1}}>Embaixadores</div>}
     </div>
   );
 }
@@ -265,7 +265,7 @@ function PageCadastro({ onNavigate }) {
         left={
           <div className="stagger">
             <div>
-              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g500,marginBottom:40}}>Clientes Embaixadores</p>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g500,marginBottom:40}}>Embaixadores</p>
               <h1 style={{fontFamily:T.serif,fontSize:56,fontWeight:400,color:T.white,lineHeight:1.08,marginBottom:32}}>Faça parte<br/>de algo<br/><em>exclusivo.</em></h1>
               <p style={{fontFamily:T.sans,fontSize:14,color:T.g400,lineHeight:1.9,maxWidth:300}}>Um convite para clientes que já fazem parte da história da Saint Germain.</p>
             </div>
@@ -554,7 +554,7 @@ function PageAdmin({ user, onLogout }) {
 
         <div style={{marginBottom:40}}>
           <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>Gestão</p>
-          <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300}}>Clientes Embaixadores</h2>
+          <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300}}>Embaixadores</h2>
         </div>
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
