@@ -587,7 +587,8 @@ function PagePainel({ user, onLogout }) {
       const {data:ex} = await supabase.from("comissoes").select("id").eq("pedido_id",String(p.id)).maybeSingle();
       if(ex) continue;
       const val = parseFloat(p.total);
-      await supabase.from("comissoes").insert({embaixador_id:emb.id,pedido_id:String(p.id),valor_pedido:val,valor_comissao:val*CONFIG.COMISSAO_PCT,status:(p.payment_status==="paid"&&diasPassados(p.created_at,CONFIG.JANELA_DEVOLUCAO))?"confirmada":"pendente",criado_em:p.created_at});
+      const status = p.payment_status==="paid" ? (diasPassados(p.created_at,CONFIG.JANELA_DEVOLUCAO)?"confirmada":"pendente") : "pendente";
+      await supabase.from("comissoes").insert({embaixador_id:emb.id,pedido_id:String(p.id),valor_pedido:val,valor_comissao:val*CONFIG.COMISSAO_PCT,status,payment_status:p.payment_status,criado_em:p.created_at});
     }
     await load(); setSync(false);
   }
@@ -635,8 +636,14 @@ function PagePainel({ user, onLogout }) {
   if(!emb) return <div style={{minHeight:"100vh"}}><Header user={user} onLogout={onLogout}/><div style={{maxWidth:480,margin:"64px auto",padding:"0 24px"}}><Alert msg="Cadastro não encontrado para este e-mail."/></div></div>;
 
   const saldoDisp = cs.filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+c.valor_comissao,0);
-  const saldoPend = cs.filter(c=>c.status==="pendente").reduce((s,c)=>s+c.valor_comissao,0);
-  const bStatus = {confirmada:["#000","Confirmada"],pendente:[T.g400,"Pendente"],paga:["#000","Paga"]};
+  const saldoPend = cs.filter(c=>c.status==="pendente"&&c.payment_status==="paid").reduce((s,c)=>s+c.valor_comissao,0);
+  const bStatus = {confirmada:["#000","Confirmada"],pendente:[T.g400,"Pendente"],paga:["#000","Paga"],cancelada:["#c00","Cancelado"]};
+  // Map payment_status to display status
+  function statusLabel(c) {
+    if(c.payment_status==="voided"||c.payment_status==="refunded") return ["#c00","Cancelado"];
+    if(c.payment_status==="abandoned") return [T.g400,"Abandonado"];
+    return bStatus[c.status] || [T.g400, c.status];
+  }
   const bResgate = {solicitado:[T.g400,"Solicitado"],aprovado:["#000","Aprovado"],pago:["#000","Pago"],recusado:["#c00","Recusado"]};
 
   return (
@@ -680,7 +687,7 @@ function PagePainel({ user, onLogout }) {
         )}
 
         {/* Stats */}
-        <StatGrid items={[[brl(saldoDisp),"Disponível para resgate"],[brl(saldoPend),"Pendente"],[brl(cs.reduce((s,c)=>s+c.valor_pedido,0)),"Total em vendas"],[brl(cs.reduce((s,c)=>s+c.valor_comissao,0)),"Comissão acumulada"]]} cols={4}/>
+        <StatGrid items={[[brl(saldoDisp),"Disponível para resgate"],[brl(saldoPend),"Pendente"],[brl(cs.reduce((s,c)=>s+c.valor_pedido,0)),"Total em vendas"],[brl(cs.filter(c=>c.payment_status==="paid"||c.status==="confirmada").reduce((s,c)=>s+c.valor_comissao,0)),"Comissão acumulada"]]} cols={4}/>
 
         {/* Tabs */}
         <Tabs tabs={["inicio","vendas","resgatar","perfil"]} labels={{inicio:"Início",vendas:`Vendas (${cs.length})`,resgatar:"Resgatar",perfil:"⚙ Perfil"}} active={tab} onChange={setTab}/>
@@ -697,7 +704,7 @@ function PagePainel({ user, onLogout }) {
               : cs.slice(0,5).map(c=>(
                 <Row key={c.id}
                   left={<div><p style={{fontFamily:T.sans,fontSize:13}}>Pedido #{c.pedido_id}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{fmt(c.criado_em)}</p></div>}
-                  right={<div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>{brl(c.valor_comissao)}</p><Badge text={bStatus[c.status]?.[1]||c.status} color={bStatus[c.status]?.[0]||T.black}/></div>}
+                  right={<div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>{brl(c.valor_comissao)}</p><Badge text={statusLabel(c)[1]} color={statusLabel(c)[0]}/></div>}
                 />
               ))
             }
@@ -717,7 +724,7 @@ function PagePainel({ user, onLogout }) {
               : cs.map(c=>(
                 <Row key={c.id}
                   left={<div><p style={{fontFamily:T.sans,fontSize:13}}>Pedido #{c.pedido_id}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{fmt(c.criado_em)} · Pedido: {brl(c.valor_pedido)}</p></div>}
-                  right={<div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>+{brl(c.valor_comissao)}</p><Badge text={bStatus[c.status]?.[1]||c.status} color={bStatus[c.status]?.[0]||T.black}/></div>}
+                  right={<div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>+{brl(c.valor_comissao)}</p><Badge text={statusLabel(c)[1]} color={statusLabel(c)[0]}/></div>}
                 />
               ))
             }
