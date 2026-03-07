@@ -69,14 +69,13 @@ const CONFIG = {
   SUPABASE_ANON_KEY:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnFuc2hrZnduZmVzd3dkbXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MzcxNDAsImV4cCI6MjA4ODMxMzE0MH0.XO5JpNdnu03tRLGUsisi3I_lTZHcMwhJMlw9VBrXkK8",
   NUVEMSHOP_USER_ID:   "1116055",
   NUVEMSHOP_TOKEN:     "803dbce287de76eb31d88c26c30e60c72126bb22",
-
+  META_PHONE_ID:       "834599116401983 ",
+  META_WABA_ID:        "1503530614291780",
+  META_TOKEN:          "EAA8IELAR7LUBQZCyoFgZAiDZACKp7BrtjiGnsDjMw5p47HWIXGHdoCwtS5sRcwIwuHKkC8OEadZCIe6QpxJOge3K1vnmZAccsps7ecpZBMYDacAbBZB58r2YJ7lxTwRZCUYmdUgxdnL713pFQletudsCAybPCs2NvAI7zXXLO4UZARhZAr3BqayiZBxl0s70TbCI4hZCbqZB75Mp0tCOtmG1Dpl453Vc43n9bmGlodG0wjVrebnRK2aS1VJCGwIZBSs4dMoZA76UmDQpEVRVjoxlLljMPvm4QdZB",
+  
   COMISSAO_PCT:        0.10,
   JANELA_DEVOLUCAO:    7,
-  META_PHONE_ID:       "834599116401983",
-  META_WABA_ID:        "1503530614291780",
-  META_TOKEN:          "EAA8IELAR7LUBQZBNFR3e8wGwmVd6DgykM94yRBq4H1T7oNqJ8n2rDNZAyYIZA1ydksC2sf7ltnVyCFC6uFrCa510fp3bI9cENA4bBiw9wNZC3LZBizNOoAHLiCKdZBYXMh8KyJhlFw6kxdvAfmYkY6diLZC83Lw5BdDVhziKpbPfrKRZCRyx1KpVuX7q75EVYapA4zdOJQWdn9RN0agkUCbgKXE2u7Nh86nkZBzXZCa0x2P1ZBSd8HpmHJ6YdhZBLJuMUcb3SDUYYZB5SK8zZAvE2wKoTeDMit",
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
-
 };
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -623,6 +622,8 @@ function PagePainel({ user, onLogout }) {
   async function salvarPerfil() {
     setSalvandoPerfil(true); setMsgPerfil({text:"",ok:false});
     const {error} = await supabase.from("embaixadores").update({
+      nome: perfil.nome, whatsapp: perfil.whatsapp,
+      instagram: perfil.instagram, tiktok: perfil.tiktok,
       pix_key: perfil.pix_key, cep: perfil.cep, endereco: perfil.endereco,
       numero: perfil.numero, complemento: perfil.complemento,
       cidade: perfil.cidade, estado: perfil.estado
@@ -790,6 +791,17 @@ function PagePainel({ user, onLogout }) {
         {tab==="perfil" && (
           <div className="perfil-wrap fade-in" style={{maxWidth:560}}>
 
+            {/* Dados pessoais */}
+            <div style={{marginBottom:48}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:24}}>Dados pessoais</p>
+              <div style={{display:"flex",flexDirection:"column",gap:24,marginBottom:24}}>
+                <Input label="Nome" value={perfil.nome||""} onChange={e=>setPerfil(p=>({...p,nome:e.target.value}))} placeholder="Seu nome completo"/>
+                <Input label="WhatsApp" value={perfil.whatsapp||""} onChange={e=>setPerfil(p=>({...p,whatsapp:e.target.value}))} placeholder="(11) 99999-9999"/>
+                <Input label="Instagram" value={perfil.instagram||""} onChange={e=>setPerfil(p=>({...p,instagram:e.target.value}))} placeholder="@seuusuario"/>
+                <Input label="TikTok" value={perfil.tiktok||""} onChange={e=>setPerfil(p=>({...p,tiktok:e.target.value}))} placeholder="@seuusuario"/>
+              </div>
+            </div>
+
             {/* Dados para resgate */}
             <div style={{marginBottom:48}}>
               <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:24}}>Dados para resgate</p>
@@ -854,6 +866,10 @@ function PageAdmin({ user, onLogout }) {
   const [loading, setLoading] = React.useState(true);
   const [tab, setTab] = React.useState("embaixadores");
   const [busca, setBusca] = React.useState("");
+  const [editEmb, setEditEmb] = React.useState(null);
+  const [editForm, setEditForm] = React.useState({});
+  const [savingEdit, setSavingEdit] = React.useState(false);
+  const [msgEdit, setMsgEdit] = React.useState({text:"",ok:false});
   const [banner, setBanner] = React.useState("");
   const [bannerPreview, setBannerPreview] = React.useState(null);
   const [uploadando, setUploadando] = React.useState(false);
@@ -940,6 +956,21 @@ function PageAdmin({ user, onLogout }) {
   }
 
 
+  async function salvarEdicao() {
+    if(!editEmb) return;
+    setSavingEdit(true); setMsgEdit({text:"",ok:false});
+    const {error} = await supabase.from("embaixadores").update({
+      nome: editForm.nome, email: editForm.email,
+      whatsapp: editForm.whatsapp, instagram: editForm.instagram,
+      tiktok: editForm.tiktok, cupom: editForm.cupom,
+      status: editForm.status, nivel: editForm.nivel,
+      pix_key: editForm.pix_key
+    }).eq("id", editEmb.id);
+    if(error) { setMsgEdit({text:"Erro ao salvar: "+error.message,ok:false}); }
+    else { setMsgEdit({text:"Salvo com sucesso!",ok:true}); await load(); setEditEmb(null); }
+    setSavingEdit(false);
+  }
+
   async function salvarGrupoLink() {
     setSalvandoGrupo(true); setMsgGrupo({text:"",ok:false});
     await supabase.from("config").upsert({chave:"grupo_vip_link",valor:grupoLinkAdmin},{onConflict:"chave"});
@@ -988,7 +1019,7 @@ function PageAdmin({ user, onLogout }) {
               return(
                 <Row key={e.id}
                   left={<div><p style={{fontFamily:T.sans,fontSize:13,marginBottom:2}}>{e.nome}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{e.email} · {e.whatsapp}</p><span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",background:T.g100,padding:"2px 8px",display:"inline-block",marginTop:4}}>{e.cupom}</span></div>}
-                  right={<div style={{textAlign:"right"}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>{brl(total)}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>total · {brl(saldo)} disponível</p></div>}
+                  right={<div style={{textAlign:"right"}}><button onClick={function(){setEditEmb(e);setEditForm({nome:e.nome,email:e.email,whatsapp:e.whatsapp||"",instagram:e.instagram||"",tiktok:e.tiktok||"",cupom:e.cupom,status:e.status,nivel:e.nivel||"embaixador",pix_key:e.pix_key||""});setMsgEdit({text:"",ok:false});}} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",border:"1px solid "+T.g200,background:"transparent",padding:"6px 14px",cursor:"pointer",marginBottom:8}}>Editar</button><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>{brl(total)}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>total · {brl(saldo)} disponível</p></div>}
                 />
               );
             })}
@@ -1128,6 +1159,56 @@ function PageAdmin({ user, onLogout }) {
           <PageWhatsApp embs={embs} />
         )}
 
+
+      {/* ── MODAL EDITAR EMBAIXADOR ── */}
+      {editEmb && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:T.white,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",padding:40}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}}>
+              <h2 style={{fontFamily:T.serif,fontSize:26,fontWeight:300}}>Editar embaixador</h2>
+              <button onClick={function(){setEditEmb(null);}} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:T.g400}}>✕</button>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:20}}>
+              <Input label="Nome" value={editForm.nome||""} onChange={function(e){setEditForm(function(f){return{...f,nome:e.target.value};});}}/>
+              <Input label="Email" value={editForm.email||""} onChange={function(e){setEditForm(function(f){return{...f,email:e.target.value};});}}/>
+              <Input label="WhatsApp" value={editForm.whatsapp||""} onChange={function(e){setEditForm(function(f){return{...f,whatsapp:e.target.value};});}}/>
+              <Input label="Instagram" value={editForm.instagram||""} onChange={function(e){setEditForm(function(f){return{...f,instagram:e.target.value};});}}/>
+              <Input label="TikTok" value={editForm.tiktok||""} onChange={function(e){setEditForm(function(f){return{...f,tiktok:e.target.value};});}}/>
+              <Input label="Cupom" value={editForm.cupom||""} onChange={function(e){setEditForm(function(f){return{...f,cupom:e.target.value};});}}/>
+              <Input label="Chave Pix" value={editForm.pix_key||""} onChange={function(e){setEditForm(function(f){return{...f,pix_key:e.target.value};});}}/>
+              <div>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400,marginBottom:8}}>Status</p>
+                <select value={editForm.status||"ativo"} onChange={function(e){setEditForm(function(f){return{...f,status:e.target.value};});}}
+                  style={{fontFamily:T.sans,fontSize:13,padding:"10px 12px",border:"1px solid "+T.g200,width:"100%",background:T.white}}>
+                  <option value="ativo">Ativo</option>
+                  <option value="pendente">Pendente</option>
+                  <option value="inativo">Inativo</option>
+                </select>
+              </div>
+              <div>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400,marginBottom:8}}>Nível</p>
+                <select value={editForm.nivel||"embaixador"} onChange={function(e){setEditForm(function(f){return{...f,nivel:e.target.value};});}}
+                  style={{fontFamily:T.sans,fontSize:13,padding:"10px 12px",border:"1px solid "+T.g200,width:"100%",background:T.white}}>
+                  <option value="embaixador">Embaixador</option>
+                  <option value="destaque">Embaixador Destaque</option>
+                  <option value="influenciador">Influenciador Oficial</option>
+                </select>
+              </div>
+            </div>
+            {msgEdit.text && <div style={{marginTop:16}}><Alert msg={msgEdit.text} ok={msgEdit.ok}/></div>}
+            <div style={{display:"flex",gap:12,marginTop:32}}>
+              <button onClick={salvarEdicao} disabled={savingEdit}
+                style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 32px",background:savingEdit?T.g200:T.black,color:T.white,border:"none",cursor:"pointer",flex:1}}>
+                {savingEdit ? "Salvando..." : "Salvar"}
+              </button>
+              <button onClick={function(){setEditEmb(null);}}
+                style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 32px",background:"transparent",color:T.black,border:"1px solid "+T.g200,cursor:"pointer"}}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
