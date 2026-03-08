@@ -1063,7 +1063,7 @@ function PageAdmin({ user, onLogout }) {
               <Row key={c.id}
                 left={<div><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}><p style={{fontFamily:T.sans,fontSize:13}}>{c.nome}</p><Badge text={c.p==="alta"?"Novo":"Inativo"} color={c.p==="alta"?T.black:T.g400}/></div><p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{c.whatsapp}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g500,marginTop:2}}>{c.motivo}</p></div>}
                 right={<div style={{display:"flex",gap:8,marginLeft:16,flexShrink:0}}>
-                  <a href={`https://wa.me/55${(c.whatsapp||"").replace(/\D/g,"")}?text=Oi ${(c.nome||"").split(" ")[0]}!`} target="_blank" rel="noopener noreferrer"><BtnSecondary style={{padding:"10px 16px",fontSize:10}}>Abrir WA</BtnSecondary></a>
+                  <a href={`https://wa.me/55${(c.whatsapp||"").replace(/[^0-9]/g,"")}?text=Oi ${(c.nome||"").split(" ")[0]}!`} target="_blank" rel="noopener noreferrer"><BtnSecondary style={{padding:"10px 16px",fontSize:10}}>Abrir WA</BtnSecondary></a>
                   <BtnGhost onClick={()=>feito(c.id)} style={{fontSize:10}}>Feito ✓</BtnGhost>
                 </div>}
               />
@@ -1090,7 +1090,7 @@ function PageAdmin({ user, onLogout }) {
                         <p style={{fontFamily:T.sans,fontSize:13}}>{e.nome}</p>
                         <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{e.cupom} · {e.nivel||"embaixador"}</p>
                       </div>
-                      <a href={`https://wa.me/55${e.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://wa.me/55${e.whatsapp.replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer"
                         style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",color:T.g400,textDecoration:"none"}}>
                         WhatsApp →
                       </a>
@@ -1290,7 +1290,7 @@ function PageChat({ embs, onUnread }) {
   function nomeContato(telefone) {
     const conv = conversas.find(function(c){ return c.telefone === telefone; });
     if(conv?.nome_contato) return conv.nome_contato;
-    const emb = embs.find(function(e){ return String(e.whatsapp||"").replace(/\D/g,"").includes(telefone.slice(-8)); });
+    const emb = embs.find(function(e){ return String(e.whatsapp||"").replace(/[^0-9]/g,"").includes(telefone.slice(-8)); });
     return emb ? emb.nome : telefone;
   }
 
@@ -1434,8 +1434,7 @@ function PageImportar({ onImported }) {
   const setM = function(k,v){ setManual(function(p){return {...p,[k]:v};}); };
 
   function parseCsv(text) {
-    const lines = text.trim().split("
-");
+    const lines = text.trim().split("\n");
     if(lines.length < 2) { setCsvErros(["Arquivo vazio ou sem dados"]); return; }
     const headers = lines[0].split(",").map(function(h){ return h.trim().replace(/"/g,"").toLowerCase(); });
     const required = ["nome","email","whatsapp","cupom"];
@@ -1580,8 +1579,7 @@ function PageImportar({ onImported }) {
             <button onClick={function(){
               const header = "nome,email,cpf,whatsapp,instagram,tiktok,cupom,nivel,status,pix_key";
               const ex = "Maria Silva,maria@email.com,123.456.789-00,11999998888,@maria,@maria,SGMARIA,embaixador,ativo,";
-              const blob = new Blob([header+"
-"+ex], {type:"text/csv;charset=utf-8;"});
+              const blob = new Blob([header+"\n"+ex], {type:"text/csv;charset=utf-8;"});
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a"); a.href=url; a.download="modelo_embaixadores.csv"; a.click();
               URL.revokeObjectURL(url);
@@ -1715,7 +1713,7 @@ function PageWhatsApp({ embs }) {
     if(!confirm("Disparar para " + lista.length + " embaixadores?")) return;
     setSending(true); setSendLog([]);
     for(const emb of lista) {
-      const fone = String(emb.whatsapp || "").replace(/\D/g,"");
+      const fone = String(emb.whatsapp || "").replace(/[^0-9]/g,"");
       if(!fone) { setSendLog(function(l){ return [...l, {nome:emb.nome,ok:false,msg:"Sem WhatsApp"}]; }); continue; }
       try {
         const res = await fetch(
