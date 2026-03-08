@@ -867,6 +867,7 @@ function PageAdmin({ user, onLogout }) {
   const [tab, setTab] = React.useState("embaixadores");
   const [busca, setBusca] = React.useState("");
   const [editEmb, setEditEmb] = React.useState(null);
+  const [unread, setUnread] = React.useState(0);
   const [editForm, setEditForm] = React.useState({});
   const [savingEdit, setSavingEdit] = React.useState(false);
   const [msgEdit, setMsgEdit] = React.useState({text:"",ok:false});
@@ -1000,7 +1001,7 @@ function PageAdmin({ user, onLogout }) {
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
 
-        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp"]} labels={{embaixadores:`Embaixadores (${embs.length})`,resgates:`Resgates${ress.length?` (${ress.length})`:""}`,fila:`Fila${fila.length?` (${fila.length})`:""}`,"ranking":"🏆 Ranking","banner":"🖼 Banner","whatsapp":"📱 WhatsApp"}} active={tab} onChange={setTab}/>
+        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp","chat","importar"]} labels={{embaixadores:`Embaixadores (${embs.length})`,resgates:`Resgates${ress.length?` (${ress.length})`:""}`,fila:`Fila${fila.length?` (${fila.length})`:""}`,"ranking":"🏆 Ranking","banner":"🖼 Banner","whatsapp":"📱 WhatsApp","chat":`💬 Chat${unread?" ("+unread+")":""}`}, "importar":"⬆ Importar"} active={tab} onChange={setTab}/>
 
         {/* TAB EMBAIXADORES */}
         {tab==="embaixadores"&&(
@@ -1155,6 +1156,14 @@ function PageAdmin({ user, onLogout }) {
           </div>
         )}
 
+        {tab==="chat" && (
+          <PageChat embs={embs} onUnread={setUnread} />
+        )}
+
+        {tab==="importar" && (
+          <PageImportar onImported={load} />
+        )}
+
         {tab==="whatsapp" && (
           <PageWhatsApp embs={embs} />
         )}
@@ -1213,6 +1222,420 @@ function PageAdmin({ user, onLogout }) {
     </div>
   );
 }
+
+// ── CHAT PAGE ────────────────────────────────────────────────────────────────
+function PageChat({ embs, onUnread }) {
+  const [conversas, setConversas] = React.useState([]);
+  const [ativa, setAtiva] = React.useState(null);
+  const [msgs, setMsgs] = React.useState([]);
+  const [texto, setTexto] = React.useState("");
+  const [enviando, setEnviando] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+  const msgsEndRef = React.useRef(null);
+
+  React.useEffect(function() {
+    carregarConversas();
+    const interval = setInterval(carregarConversas, 15000);
+    return function(){ clearInterval(interval); };
+  }, []);
+
+  React.useEffect(function() {
+    if(ativa) carregarMensagens(ativa.telefone);
+  }, [ativa]);
+
+  React.useEffect(function() {
+    if(msgsEndRef.current) msgsEndRef.current.scrollIntoView({behavior:"smooth"});
+  }, [msgs]);
+
+  async function carregarConversas() {
+    const { data } = await supabase
+      .from("mensagens_whatsapp")
+      .select("telefone,nome_contato,conteudo,direcao,lida,criado_em")
+      .order("criado_em", {ascending:false});
+
+    if(!data) { setLoading(false); return; }
+
+    // Group by telefone - last message per contact
+    const map = {};
+    data.forEach(function(m) {
+      if(!map[m.telefone]) map[m.telefone] = {...m, nao_lidas: 0};
+      if(!m.lida && m.direcao === "recebida") map[m.telefone].nao_lidas++;
+    });
+
+    const lista = Object.values(map).sort(function(a,b){ return new Date(b.criado_em) - new Date(a.criado_em); });
+    setConversas(lista);
+    const totalNaoLidas = lista.reduce(function(s,c){ return s + c.nao_lidas; }, 0);
+    onUnread(totalNaoLidas);
+    setLoading(false);
+  }
+
+  async function carregarMensagens(telefone) {
+    const { data } = await supabase
+      .from("mensagens_whatsapp")
+      .select("*")
+      .eq("telefone", telefone)
+      .order("criado_em", {ascending:true});
+    setMsgs(data || []);
+
+    // Marcar como lidas
+    await supabase.from("mensagens_whatsapp")
+      .update({lida:true})
+      .eq("telefone", telefone)
+      .eq("direcao", "recebida")
+      .eq("lida", false);
+
+    await carregarConversas();
+  }
+
+  function nomeContato(telefone) {
+    const conv = conversas.find(function(c){ return c.telefone === telefone; });
+    if(conv?.nome_contato) return conv.nome_contato;
+    const emb = embs.find(function(e){ return String(e.whatsapp||"").replace(/\D/g,"").includes(telefone.slice(-8)); });
+    return emb ? emb.nome : telefone;
+  }
+
+  async function enviarResposta() {
+    if(!texto.trim() || !ativa) return;
+    setEnviando(true);
+    const fone = ativa.telefone;
+    try {
+      const res = await fetch(
+        "https://graph.facebook.com/v19.0/" + CONFIG.META_PHONE_ID + "/messages",
+        {
+          method: "POST",
+          headers: {"Content-Type":"application/json", Authorization:"Bearer "+CONFIG.META_TOKEN},
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: fone,
+            type: "text",
+            text: { body: texto }
+          })
+        }
+      );
+      const data = await res.json();
+      if(data.error) throw new Error(data.error.message);
+
+      // Save sent message to DB
+      await supabase.from("mensagens_whatsapp").insert({
+        telefone: fone, direcao: "enviada",
+        conteudo: texto, lida: true,
+        nome_contato: nomeContato(fone)
+      });
+
+      setTexto("");
+      await carregarMensagens(fone);
+    } catch(e) { alert("Erro ao enviar: "+e.message); }
+    setEnviando(false);
+  }
+
+  function formatHora(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  }
+  function formatData(iso) {
+    return new Date(iso).toLocaleDateString("pt-BR");
+  }
+
+  if(loading) return <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Carregando conversas...</p>;
+
+  return (
+    <div className="fade-in" style={{display:"flex",gap:0,border:"1px solid "+T.g200,height:600,overflow:"hidden"}}>
+
+      {/* Lista de conversas */}
+      <div style={{width:280,borderRight:"1px solid "+T.g200,overflowY:"auto",flexShrink:0}}>
+        <div style={{padding:"16px 20px",borderBottom:"1px solid "+T.g200}}>
+          <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase"}}>Conversas</p>
+        </div>
+        {conversas.length === 0 && (
+          <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,padding:20}}>Nenhuma mensagem recebida ainda.</p>
+        )}
+        {conversas.map(function(c) {
+          const sel = ativa?.telefone === c.telefone;
+          return (
+            <div key={c.telefone} onClick={function(){ setAtiva(c); }}
+              style={{padding:"14px 20px",borderBottom:"1px solid "+T.g200,cursor:"pointer",background:sel?T.g100:"transparent"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                <p style={{fontFamily:T.sans,fontSize:13,fontWeight:sel?600:400}}>{nomeContato(c.telefone)}</p>
+                {c.nao_lidas > 0 && (
+                  <span style={{background:T.black,color:T.white,fontFamily:T.sans,fontSize:10,borderRadius:10,padding:"2px 7px",flexShrink:0}}>{c.nao_lidas}</span>
+                )}
+              </div>
+              <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
+                {c.direcao==="enviada"?"Você: ":""}{c.conteudo}
+              </p>
+              <p style={{fontFamily:T.sans,fontSize:10,color:T.g300,marginTop:4}}>{formatData(c.criado_em)}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Área de mensagens */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {!ativa ? (
+          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Selecione uma conversa</p>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{padding:"16px 20px",borderBottom:"1px solid "+T.g200,flexShrink:0}}>
+              <p style={{fontFamily:T.sans,fontSize:13,fontWeight:600}}>{nomeContato(ativa.telefone)}</p>
+              <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{ativa.telefone}</p>
+            </div>
+
+            {/* Mensagens */}
+            <div style={{flex:1,overflowY:"auto",padding:20,display:"flex",flexDirection:"column",gap:10}}>
+              {msgs.map(function(m) {
+                const sent = m.direcao === "enviada";
+                return (
+                  <div key={m.id} style={{display:"flex",justifyContent:sent?"flex-end":"flex-start"}}>
+                    <div style={{maxWidth:"72%",background:sent?T.black:T.g100,color:sent?T.white:T.black,padding:"10px 14px",borderRadius:2}}>
+                      <p style={{fontFamily:T.sans,fontSize:13,lineHeight:1.5}}>{m.conteudo}</p>
+                      <p style={{fontFamily:T.sans,fontSize:10,color:sent?"#aaa":T.g400,marginTop:4,textAlign:"right"}}>{formatHora(m.criado_em)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={msgsEndRef}/>
+            </div>
+
+            {/* Input */}
+            <div style={{padding:16,borderTop:"1px solid "+T.g200,display:"flex",gap:10,flexShrink:0}}>
+              <input
+                value={texto}
+                onChange={function(e){ setTexto(e.target.value); }}
+                onKeyDown={function(e){ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); enviarResposta(); } }}
+                placeholder="Digite sua mensagem..."
+                style={{flex:1,fontFamily:T.sans,fontSize:13,padding:"10px 14px",border:"1px solid "+T.g200,outline:"none"}}
+              />
+              <button onClick={enviarResposta} disabled={enviando||!texto.trim()}
+                style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",background:enviando||!texto.trim()?T.g200:T.black,color:T.white,border:"none",cursor:enviando||!texto.trim()?"not-allowed":"pointer",flexShrink:0}}>
+                {enviando ? "..." : "Enviar"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// ── IMPORTAR PAGE ─────────────────────────────────────────────────────────────
+function PageImportar({ onImported }) {
+  const [modo, setModo] = React.useState("csv"); // "csv" | "manual"
+  const [csvData, setCsvData] = React.useState([]);
+  const [csvErros, setCsvErros] = React.useState([]);
+  const [importando, setImportando] = React.useState(false);
+  const [resultados, setResultados] = React.useState(null);
+  const [manual, setManual] = React.useState({nome:"",email:"",cpf:"",whatsapp:"",instagram:"",tiktok:"",cupom:"",nivel:"embaixador",status:"ativo"});
+  const [salvandoManual, setSalvandoManual] = React.useState(false);
+  const [msgManual, setMsgManual] = React.useState({text:"",ok:false});
+  const setM = function(k,v){ setManual(function(p){return {...p,[k]:v};}); };
+
+  function parseCsv(text) {
+    const lines = text.trim().split("
+");
+    if(lines.length < 2) { setCsvErros(["Arquivo vazio ou sem dados"]); return; }
+    const headers = lines[0].split(",").map(function(h){ return h.trim().replace(/"/g,"").toLowerCase(); });
+    const required = ["nome","email","whatsapp","cupom"];
+    const missing = required.filter(function(r){ return !headers.includes(r); });
+    if(missing.length) { setCsvErros(["Colunas obrigatórias ausentes: "+missing.join(", ")]); return; }
+
+    const rows = []; const erros = [];
+    for(let i=1; i<lines.length; i++) {
+      const vals = lines[i].split(",").map(function(v){ return v.trim().replace(/^"|"$/g,""); });
+      const row = {};
+      headers.forEach(function(h,idx){ row[h] = vals[idx]||""; });
+      if(!row.nome||!row.email||!row.whatsapp||!row.cupom) {
+        erros.push("Linha "+(i+1)+": dados obrigatórios faltando");
+      } else {
+        rows.push(row);
+      }
+    }
+    setCsvData(rows); setCsvErros(erros);
+  }
+
+  function handleFile(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    setCsvData([]); setCsvErros([]); setResultados(null);
+    const reader = new FileReader();
+    reader.onload = function(ev){ parseCsv(ev.target.result); };
+    reader.readAsText(file, "UTF-8");
+  }
+
+  async function importarCsv() {
+    if(!csvData.length) return;
+    setImportando(true); setResultados(null);
+    let ok=0, erros=[];
+    for(const row of csvData) {
+      const {error} = await supabase.from("embaixadores").insert({
+        nome: row.nome, email: row.email, cpf: row.cpf||"",
+        whatsapp: row.whatsapp, instagram: row.instagram||"",
+        tiktok: row.tiktok||"", cupom: row.cupom.toUpperCase(),
+        nivel: row.nivel||"embaixador", status: row.status||"ativo",
+        pix_key: row.pix_key||""
+      });
+      if(error) { erros.push(row.email+": "+error.message); }
+      else { ok++; }
+    }
+    setResultados({ok, erros});
+    if(ok>0) onImported();
+    setImportando(false);
+  }
+
+  async function salvarManual() {
+    if(!manual.nome||!manual.email||!manual.whatsapp||!manual.cupom) {
+      setMsgManual({text:"Preencha nome, email, WhatsApp e cupom.",ok:false}); return;
+    }
+    setSalvandoManual(true); setMsgManual({text:"",ok:false});
+    const {error} = await supabase.from("embaixadores").insert({
+      nome:manual.nome, email:manual.email, cpf:manual.cpf||"",
+      whatsapp:manual.whatsapp, instagram:manual.instagram||"",
+      tiktok:manual.tiktok||"", cupom:manual.cupom.toUpperCase(),
+      nivel:manual.nivel, status:manual.status, pix_key:""
+    });
+    if(error) { setMsgManual({text:"Erro: "+error.message,ok:false}); }
+    else {
+      setMsgManual({text:"Embaixador cadastrado com sucesso!",ok:true});
+      setManual({nome:"",email:"",cpf:"",whatsapp:"",instagram:"",tiktok:"",cupom:"",nivel:"embaixador",status:"ativo"});
+      onImported();
+    }
+    setSalvandoManual(false);
+  }
+
+  return (
+    <div className="fade-in" style={{maxWidth:640}}>
+      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",color:T.g400,textTransform:"uppercase",marginBottom:4}}>Cadastro</p>
+      <h2 style={{fontFamily:T.serif,fontSize:32,fontWeight:300,marginBottom:32}}>Importar embaixadores</h2>
+
+      {/* Toggle modo */}
+      <div style={{display:"flex",gap:0,marginBottom:40,borderBottom:"1px solid "+T.g200}}>
+        {[["csv","Importar CSV"],["manual","Adicionar manual"]].map(function(arr){
+          const v=arr[0],l=arr[1];
+          return (
+            <button key={v} onClick={function(){setModo(v);setResultados(null);setMsgManual({text:"",ok:false});}}
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"12px 24px",background:"transparent",border:"none",borderBottom:"2px solid "+(modo===v?T.black:"transparent"),color:modo===v?T.black:T.g400,cursor:"pointer"}}>
+              {l}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── CSV ── */}
+      {modo==="csv" && (
+        <div>
+          <div style={{border:"2px dashed "+T.g200,padding:32,textAlign:"center",marginBottom:24}}>
+            <p style={{fontFamily:T.sans,fontSize:13,marginBottom:16,color:T.g400}}>Selecione um arquivo CSV com as colunas:</p>
+            <p style={{fontFamily:T.sans,fontSize:11,color:T.black,marginBottom:20,letterSpacing:"0.05em"}}>
+              nome*, email*, cpf, whatsapp*, instagram, tiktok, cupom*, nivel, status, pix_key
+            </p>
+            <input type="file" accept=".csv" onChange={handleFile}
+              style={{fontFamily:T.sans,fontSize:12,cursor:"pointer"}}/>
+          </div>
+
+          {csvErros.length>0 && (
+            <div style={{background:"#fff0f0",border:"1px solid #fcc",padding:16,marginBottom:16}}>
+              {csvErros.map(function(e,i){ return <p key={i} style={{fontFamily:T.sans,fontSize:12,color:"#c00",marginBottom:4}}>{e}</p>; })}
+            </div>
+          )}
+
+          {csvData.length>0 && (
+            <div style={{marginBottom:24}}>
+              <p style={{fontFamily:T.sans,fontSize:12,color:T.g400,marginBottom:12}}>{csvData.length} linha{csvData.length!==1?"s":""} prontas para importar</p>
+              <div style={{border:"1px solid "+T.g200,maxHeight:200,overflowY:"auto"}}>
+                {csvData.slice(0,5).map(function(r,i){
+                  return (
+                    <div key={i} style={{display:"flex",gap:16,padding:"10px 16px",borderBottom:"1px solid "+T.g200,fontFamily:T.sans,fontSize:12}}>
+                      <span style={{flex:2}}>{r.nome}</span>
+                      <span style={{flex:3,color:T.g400}}>{r.email}</span>
+                      <span style={{flex:1,fontWeight:600}}>{r.cupom}</span>
+                    </div>
+                  );
+                })}
+                {csvData.length>5 && <p style={{padding:"8px 16px",fontFamily:T.sans,fontSize:11,color:T.g400}}>+{csvData.length-5} mais...</p>}
+              </div>
+              <button onClick={importarCsv} disabled={importando}
+                style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 32px",background:importando?T.g200:T.black,color:T.white,border:"none",cursor:importando?"not-allowed":"pointer",marginTop:16}}>
+                {importando ? "Importando..." : "Importar "+csvData.length+" embaixadores"}
+              </button>
+            </div>
+          )}
+
+          {resultados && (
+            <div style={{border:"1px solid "+T.g200,padding:20,marginTop:16}}>
+              <p style={{fontFamily:T.sans,fontSize:13,fontWeight:600,marginBottom:8,color:resultados.ok>0?"#2a7a2a":"#c00"}}>
+                {resultados.ok} importado{resultados.ok!==1?"s":""} com sucesso
+              </p>
+              {resultados.erros.map(function(e,i){
+                return <p key={i} style={{fontFamily:T.sans,fontSize:11,color:"#c00",marginBottom:4}}>{e}</p>;
+              })}
+            </div>
+          )}
+
+          {/* Template CSV download */}
+          <div style={{marginTop:32,paddingTop:24,borderTop:"1px solid "+T.g200}}>
+            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:12}}>Baixar modelo de planilha</p>
+            <button onClick={function(){
+              const header = "nome,email,cpf,whatsapp,instagram,tiktok,cupom,nivel,status,pix_key";
+              const ex = "Maria Silva,maria@email.com,123.456.789-00,11999998888,@maria,@maria,SGMARIA,embaixador,ativo,";
+              const blob = new Blob([header+"
+"+ex], {type:"text/csv;charset=utf-8;"});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a"); a.href=url; a.download="modelo_embaixadores.csv"; a.click();
+              URL.revokeObjectURL(url);
+            }} style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",border:"1px solid "+T.g200,background:"transparent",cursor:"pointer"}}>
+              ↓ Baixar modelo CSV
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── MANUAL ── */}
+      {modo==="manual" && (
+        <div style={{display:"flex",flexDirection:"column",gap:20}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+            <Input label="Nome*" value={manual.nome} onChange={function(e){setM("nome",e.target.value);}}/>
+            <Input label="Email*" value={manual.email} onChange={function(e){setM("email",e.target.value);}}/>
+            <Input label="CPF" value={manual.cpf} onChange={function(e){setM("cpf",e.target.value);}} placeholder="000.000.000-00"/>
+            <Input label="WhatsApp*" value={manual.whatsapp} onChange={function(e){setM("whatsapp",e.target.value);}} placeholder="11999998888"/>
+            <Input label="Instagram" value={manual.instagram} onChange={function(e){setM("instagram",e.target.value);}} placeholder="@usuario"/>
+            <Input label="TikTok" value={manual.tiktok} onChange={function(e){setM("tiktok",e.target.value);}} placeholder="@usuario"/>
+            <Input label="Cupom*" value={manual.cupom} onChange={function(e){setM("cupom",e.target.value.toUpperCase());}} placeholder="SGMARIA"/>
+            <div/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+            <div>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400,marginBottom:8}}>Nível</p>
+              <select value={manual.nivel} onChange={function(e){setM("nivel",e.target.value);}}
+                style={{fontFamily:T.sans,fontSize:13,padding:"10px 12px",border:"1px solid "+T.g200,width:"100%",background:T.white}}>
+                <option value="embaixador">Embaixador</option>
+                <option value="destaque">Embaixador Destaque</option>
+                <option value="influenciador">Influenciador Oficial</option>
+              </select>
+            </div>
+            <div>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400,marginBottom:8}}>Status</p>
+              <select value={manual.status} onChange={function(e){setM("status",e.target.value);}}
+                style={{fontFamily:T.sans,fontSize:13,padding:"10px 12px",border:"1px solid "+T.g200,width:"100%",background:T.white}}>
+                <option value="ativo">Ativo</option>
+                <option value="pendente">Pendente</option>
+                <option value="inativo">Inativo</option>
+              </select>
+            </div>
+          </div>
+          {msgManual.text && <Alert msg={msgManual.text} ok={msgManual.ok}/>}
+          <button onClick={salvarManual} disabled={salvandoManual}
+            style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 32px",background:salvandoManual?T.g200:T.black,color:T.white,border:"none",cursor:"pointer",alignSelf:"flex-start"}}>
+            {salvandoManual ? "Salvando..." : "Cadastrar embaixador"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ── WHATSAPP PAGE ────────────────────────────────────────────────────────────
 function PageWhatsApp({ embs }) {
