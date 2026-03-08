@@ -76,6 +76,7 @@ const CONFIG = {
   COMISSAO_PCT:        0.10,
   JANELA_DEVOLUCAO:    7,
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
+
 };
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -1706,6 +1707,31 @@ function PageWhatsApp({ embs }) {
     return [];
   }
 
+  function buildComponents(tpl, emb) {
+    // Detect how many variables the template body has
+    const body = (tpl.components || []).find(function(c){ return c.type === "BODY"; });
+    if(!body || !body.text) return [];
+    const matches = body.text.match(/{{[0-9]+}}/g) || [];
+    const count = matches.length;
+    if(count === 0) return [];
+
+    // Map variable positions to data
+    // Convention: {{1}} = nome, {{2}} = link painel, {{3}} = cupom
+    const portalUrl = "https://embaixadores.saintgermainbrand.com.br";
+    const params = [
+      emb.nome || "",
+      portalUrl,
+      emb.cupom || "",
+      emb.instagram || "",
+    ];
+
+    const parameters = [];
+    for(let i = 0; i < count; i++) {
+      parameters.push({ type: "text", text: params[i] || "" });
+    }
+    return [{ type: "body", parameters }];
+  }
+
   async function disparar() {
     if(!selectedTpl) { alert("Selecione um template."); return; }
     const lista = destinatarios();
@@ -1725,7 +1751,11 @@ function PageWhatsApp({ embs }) {
               messaging_product: "whatsapp",
               to: fone.startsWith("55") ? fone : "55" + fone,
               type: "template",
-              template: { name: selectedTpl.name, language: { code: selectedTpl.language } }
+              template: {
+                name: selectedTpl.name,
+                language: { code: selectedTpl.language },
+                components: buildComponents(selectedTpl, emb)
+              }
             })
           }
         );
