@@ -1001,7 +1001,7 @@ function PageAdmin({ user, onLogout }) {
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
 
-        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp","chat","importar"]} labels={{embaixadores:`Embaixadores (${embs.length})`,resgates:`Resgates${ress.length?` (${ress.length})`:""}`,fila:`Fila${fila.length?` (${fila.length})`:""}`,"ranking":"🏆 Ranking","banner":"🖼 Banner","whatsapp":"📱 WhatsApp","chat":`💬 Chat${unread?" ("+unread+")":""}`}, "importar":"⬆ Importar"} active={tab} onChange={setTab}/>
+        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp","chat","importar"]} labels={{embaixadores:`Embaixadores (${embs.length})`,resgates:`Resgates${ress.length?` (${ress.length})`:""}`,fila:`Fila${fila.length?` (${fila.length})`:""}`,"ranking":"🏆 Ranking","banner":"🖼 Banner","whatsapp":"📱 WhatsApp","chat":`💬 Chat${unread?" ("+unread+")":""}`, "importar":"⬆ Importar"}} active={tab} onChange={setTab}/>
 
         {/* TAB EMBAIXADORES */}
         {tab==="embaixadores"&&(
