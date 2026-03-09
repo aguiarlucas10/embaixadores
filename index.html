@@ -8,6 +8,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Questrial&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&display=swap" rel="stylesheet">
@@ -84,10 +85,10 @@ const CONFIG = {
   META_WABA_ID:        "1503530614291780",
   META_TOKEN:          "EAA8IELAR7LUBQzhJWDGJN36DJVju4w29Nu1ilYqNSFgOLTDYk2gKwX90HnEc5xsauZCMPZB7WgmAi6joKXcT2ZB9BdXOuiD4I6DJ8CcwYTrsfIfmajC8GxhjgaGkCE8XcPIYJZCF9JziKZBuZCZCWPvRlTvdkXeASK0JdTyH57qIvfFJLXbZBPYwPEalKk4EFp59bgZDZD",
   
-  COMISSAO_PCT:        0.10,
-  DESCONTO_PCT:        0.10,
-  JANELA_DEVOLUCAO:    7,
-  ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
+  COMISSAO_PCT:           0.10,
+  DESCONTO_PCT:           0.10,
+  JANELA_DEVOLUCAO:       7,
+  ADMIN_EMAILS:           ["adminsg@saintgermain.com.br"],
 
 };
 
@@ -439,6 +440,11 @@ function PageCadastro({ onNavigate }) {
   const [loadingAcesso, setLoadingAcesso] = React.useState(false);
   const [err, setErr] = React.useState("");
   const set = (k,v) => setF(p=>({...p,[k]:v}));
+
+  // Registra visita para analytics
+  React.useEffect(()=>{
+    supabase.from("page_views").insert({pagina:"cadastro",referrer:document.referrer||null,criado_em:new Date().toISOString()}).then(()=>{});
+  },[]);
 
   // Gera opções de cupom a partir do nome
   function gerarOpcoes(nome) {
@@ -1345,13 +1351,15 @@ function PageAdmin({ user, onLogout }) {
   const [todosResgates, setTodosResgates] = React.useState([]);
   const [fila, setFila] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
-  const [tab, setTab] = React.useState("embaixadores");
+  const [tab, setTab] = React.useState("dashboard");
   const [busca, setBusca] = React.useState("");
   const [editEmb, setEditEmb] = React.useState(null);
   const [unread, setUnread] = React.useState(0);
   const [editForm, setEditForm] = React.useState({});
   const [savingEdit, setSavingEdit] = React.useState(false);
   const [msgEdit, setMsgEdit] = React.useState({text:"",ok:false});
+  const [dash, setDash] = React.useState(null);
+  const [dashPeriodo, setDashPeriodo] = React.useState(30);
   const [banner, setBanner] = React.useState("");
   const [bannerPreview, setBannerPreview] = React.useState(null);
   const [uploadando, setUploadando] = React.useState(false);
@@ -1386,6 +1394,87 @@ function PageAdmin({ user, onLogout }) {
   async function aprovar(id){await supabase.from("resgates").update({status:"aprovado"}).eq("id",id);await load();}
   async function recusar(id){await supabase.from("resgates").update({status:"recusado"}).eq("id",id);await load();}
   async function feito(id){await supabase.from("embaixadores").update({ultimo_contato:new Date().toISOString()}).eq("id",id);setFila(f=>f.filter(x=>x.id!==id));}
+
+  React.useEffect(()=>{ loadDashboard(dashPeriodo); },[dashPeriodo]);
+
+  async function loadDashboard(dias) {
+    const desde = new Date(Date.now() - dias*86400000).toISOString();
+
+    const {data:coms}     = await supabase.from("comissoes").select("embaixador_id,valor_pedido,valor_comissao,status,payment_status,criado_em").gte("criado_em",desde).order("criado_em",{ascending:true});
+    const {data:todosEmbs}= await supabase.from("embaixadores").select("id,nome,status,criado_em");
+    const {data:resgAll}  = await supabase.from("resgates").select("valor,status,criado_em").order("criado_em",{ascending:true});
+    const {data:views}    = await supabase.from("page_views").select("criado_em").gte("criado_em",desde);
+
+    // Init buckets per day
+    const fatDiario = {};
+    const cadDiario = {};
+    for(let d=0;d<dias;d++){
+      const dt  = new Date(Date.now()-(dias-1-d)*86400000);
+      const key = dt.toISOString().slice(0,10);
+      fatDiario[key] = {faturamento:0, comissao:0};
+      cadDiario[key] = {cadastros:0, visitas:0};
+    }
+    (coms||[]).forEach(c=>{
+      const k = c.criado_em.slice(0,10);
+      if(fatDiario[k]){ fatDiario[k].faturamento+=c.valor_pedido||0; fatDiario[k].comissao+=c.valor_comissao||0; }
+    });
+    (todosEmbs||[]).filter(e=>e.criado_em>=desde).forEach(e=>{
+      const k=e.criado_em.slice(0,10); if(cadDiario[k]) cadDiario[k].cadastros+=1;
+    });
+    (views||[]).forEach(v=>{
+      const k=v.criado_em.slice(0,10); if(cadDiario[k]) cadDiario[k].visitas+=1;
+    });
+
+    const timeline = Object.keys(fatDiario).sort().map(k=>({
+      data:      k.slice(5),
+      fat:       Math.round(fatDiario[k].faturamento*100)/100,
+      comissao:  Math.round(fatDiario[k].comissao*100)/100,
+      cadastros: cadDiario[k]?.cadastros||0,
+      visitas:   cadDiario[k]?.visitas||0,
+    }));
+
+    const pagos  = (coms||[]).filter(c=>c.payment_status==="paid"||c.status==="confirmada");
+    const totalFat     = pagos.reduce((s,c)=>s+(c.valor_pedido||0),0);
+    const totalCom     = pagos.reduce((s,c)=>s+(c.valor_comissao||0),0);
+    const totalPed     = pagos.length;
+    const ticketMedio  = totalPed>0?totalFat/totalPed:0;
+    const ativas       = (todosEmbs||[]).filter(e=>e.status==="ativo").length;
+    const comVenda     = new Set(pagos.map(c=>c.embaixador_id).filter(Boolean)).size;
+    const visitasTotal = (views||[]).length;
+    const cadPeriodo   = (todosEmbs||[]).filter(e=>e.criado_em>=desde).length;
+    const txConversao  = visitasTotal>0?Math.round((cadPeriodo/visitasTotal)*100):0;
+
+    const funil = [
+      {etapa:"Visitas",   valor:visitasTotal,  pct:100},
+      {etapa:"Cadastros", valor:cadPeriodo,    pct:visitasTotal>0?Math.round(cadPeriodo/visitasTotal*100):0},
+      {etapa:"1a venda",  valor:comVenda,      pct:cadPeriodo>0?Math.round(comVenda/cadPeriodo*100):0},
+    ];
+
+    const rankMap = {};
+    pagos.forEach(c=>{
+      if(!c.embaixador_id) return;
+      if(!rankMap[c.embaixador_id]) rankMap[c.embaixador_id]={id:c.embaixador_id,fat:0,peds:0,com:0};
+      rankMap[c.embaixador_id].fat+=c.valor_pedido||0;
+      rankMap[c.embaixador_id].peds+=1;
+      rankMap[c.embaixador_id].com+=c.valor_comissao||0;
+    });
+    const embMap={};
+    (todosEmbs||[]).forEach(e=>embMap[e.id]=e.nome);
+    const top10 = Object.values(rankMap)
+      .sort((a,b)=>b.fat-a.fat).slice(0,10)
+      .map(r=>({...r,nome:(embMap[r.id]||"?").split(" ").slice(0,2).join(" ")}));
+
+    const resgMap={};
+    (resgAll||[]).forEach(r=>{
+      const k=r.criado_em.slice(0,7);
+      if(!resgMap[k]) resgMap[k]={mes:k,valor:0,qtd:0};
+      resgMap[k].valor+=r.valor||0; resgMap[k].qtd+=1;
+    });
+    const resgPorMes=Object.values(resgMap).sort((a,b)=>a.mes.localeCompare(b.mes)).slice(-6);
+
+    setDash({timeline,totalFat,totalCom,totalPed,ticketMedio,ativas,comVenda,txConversao,funil,top10,resgPorMes,visitasTotal,cadPeriodo});
+  }
+
 
   async function salvarBanner(e) {
     const file = e.target.files?.[0];
@@ -1465,6 +1554,9 @@ function PageAdmin({ user, onLogout }) {
   }
 
 
+
+
+
   async function salvarEdicao() {
     if(!editEmb) return;
     setSavingEdit(true); setMsgEdit({text:"",ok:false});
@@ -1509,9 +1601,161 @@ function PageAdmin({ user, onLogout }) {
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
 
-        <Tabs tabs={["embaixadores","resgates","financeiro","fila","ranking","banner","whatsapp","chat","importar","estreia"]} labels={{embaixadores:"Embaixadores ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),financeiro:"Financeiro",fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar",estreia:"Pre-estreia"}} active={tab} onChange={setTab}>
+        <Tabs tabs={["dashboard","embaixadores","resgates","financeiro","fila","ranking","banner","whatsapp","chat","importar","estreia"]} labels={{dashboard:"Dashboard",embaixadores:"Embaixadores ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),financeiro:"Financeiro",fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar",estreia:"Pre-estreia"}} active={tab} onChange={setTab}>
 
         {/* TAB EMBAIXADORES */}
+        {/* TAB DASHBOARD */}
+        {tab==="dashboard" && (
+          <div className="fade-in">
+
+            {/* Seletor de periodo */}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:32}}>
+              {[30,90,180].map(d=>(
+                <button key={d} onClick={()=>setDashPeriodo(d)}
+                  style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",padding:"8px 16px",border:`1px solid ${dashPeriodo===d?T.black:T.g200}`,background:dashPeriodo===d?T.black:"transparent",color:dashPeriodo===d?T.white:T.g400,cursor:"pointer",transition:"all 0.15s"}}>
+                  {d}d
+                </button>
+              ))}
+              <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:8}}>Últimos {dashPeriodo} dias</span>
+              {!dash&&<span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:16}}>Carregando...</span>}
+            </div>
+
+            {dash && (() => {
+              const { BarChart,Bar,LineChart,Line,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer,Legend,FunnelChart,Funnel,LabelList,Cell } = Recharts;
+              const fmt2 = v => "R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:0});
+
+              return (
+                <div>
+
+                  {/* KPI cards */}
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:1,border:`1px solid ${T.g200}`,marginBottom:40}}>
+                    {[
+                      ["Faturamento",    fmt2(dash.totalFat),         "vendas confirmadas no período"],
+                      ["Comissões",      fmt2(dash.totalCom),         "geradas no período"],
+                      ["Pedidos",        dash.totalPed,               "com cupom no período"],
+                      ["Ticket médio",   fmt2(dash.ticketMedio),      "por pedido"],
+                      ["Ativas",         dash.ativas,                 "embaixadoras cadastradas"],
+                      ["Com venda",      dash.comVenda,               "venderam no período"],
+                      ["Visitas LP",     dash.visitasTotal,           "acessos à página"],
+                      ["Conversão",      dash.txConversao+"%",        "visitas → cadastros"],
+                    ].map(([label,val,sub])=>(
+                      <div key={label} style={{padding:"20px 24px",borderRight:`1px solid ${T.g200}`,background:T.white}}>
+                        <p style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>{label}</p>
+                        <p style={{fontFamily:T.serif,fontSize:28,fontWeight:300,lineHeight:1,marginBottom:4}}>{val}</p>
+                        <p style={{fontFamily:T.sans,fontSize:10,color:T.g400,lineHeight:1.4}}>{sub}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Grafico faturamento diario */}
+                  <div style={{marginBottom:48}}>
+                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Faturamento diário</p>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={dash.timeline} margin={{top:0,right:0,left:0,bottom:0}}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={T.g200} vertical={false}/>
+                        <XAxis dataKey="data" tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}
+                          interval={Math.floor(dash.timeline.length/8)}/>
+                        <YAxis tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}
+                          tickFormatter={v=>v===0?"":("R$"+v.toLocaleString("pt-BR",{maximumFractionDigits:0}))}/>
+                        <Tooltip formatter={(v,n)=>["R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2}),n==="fat"?"Faturamento":"Comissão"]}
+                          contentStyle={{fontFamily:T.sans,fontSize:11,border:`1px solid ${T.g200}`,borderRadius:0}}/>
+                        <Bar dataKey="fat" fill={T.black} radius={[2,2,0,0]} maxBarSize={20}/>
+                        <Bar dataKey="comissao" fill={T.g400} radius={[2,2,0,0]} maxBarSize={20}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div style={{display:"flex",gap:24,marginTop:8}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:10,background:T.black,display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>Faturamento</span></div>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:10,background:T.g400,display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>Comissão</span></div>
+                    </div>
+                  </div>
+
+                  {/* Grafico cadastros vs visitas */}
+                  <div style={{marginBottom:48}}>
+                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Cadastros e visitas diárias</p>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart data={dash.timeline} margin={{top:0,right:0,left:0,bottom:0}}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={T.g200} vertical={false}/>
+                        <XAxis dataKey="data" tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}
+                          interval={Math.floor(dash.timeline.length/8)}/>
+                        <YAxis allowDecimals={false} tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}/>
+                        <Tooltip contentStyle={{fontFamily:T.sans,fontSize:11,border:`1px solid ${T.g200}`,borderRadius:0}}/>
+                        <Line type="monotone" dataKey="visitas"   stroke={T.g400} strokeWidth={1.5} dot={false} name="Visitas"/>
+                        <Line type="monotone" dataKey="cadastros" stroke={T.black} strokeWidth={2}   dot={false} name="Cadastros"/>
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <div style={{display:"flex",gap:24,marginTop:8}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:2,background:T.black,display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>Cadastros</span></div>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:2,background:T.g400,display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>Visitas</span></div>
+                    </div>
+                  </div>
+
+                  {/* Funil + Resgates por mes lado a lado */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,marginBottom:48}}>
+
+                    {/* Funil de conversao */}
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Funil de conversão</p>
+                      {dash.funil.map((f,i)=>(
+                        <div key={f.etapa} style={{marginBottom:12}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                            <span style={{fontFamily:T.sans,fontSize:11,color:T.g500}}>{f.etapa}</span>
+                            <span style={{fontFamily:T.sans,fontSize:11,color:T.black,fontWeight:500}}>{f.valor} <span style={{color:T.g400,fontWeight:400}}>({f.pct}%)</span></span>
+                          </div>
+                          <div style={{height:8,background:T.g100,borderRadius:2,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:f.pct+"%",background:i===0?T.black:i===1?"#555":T.g400,transition:"width 0.6s ease"}}/>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Resgates por mes */}
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Resgates por mês</p>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <BarChart data={dash.resgPorMes} margin={{top:0,right:0,left:0,bottom:0}}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={T.g200} vertical={false}/>
+                          <XAxis dataKey="mes" tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}/>
+                          <YAxis tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}
+                            tickFormatter={v=>v===0?"":("R$"+v.toLocaleString("pt-BR",{maximumFractionDigits:0}))}/>
+                          <Tooltip formatter={(v)=>["R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2}),"Resgates"]}
+                            contentStyle={{fontFamily:T.sans,fontSize:11,border:`1px solid ${T.g200}`,borderRadius:0}}/>
+                          <Bar dataKey="valor" fill={T.black} radius={[2,2,0,0]} maxBarSize={28}/>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Top embaixadoras */}
+                  <div style={{marginBottom:40}}>
+                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Top embaixadoras por faturamento</p>
+                    {dash.top10.length===0
+                      ? <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhuma venda registrada no período.</p>
+                      : dash.top10.map((r,i)=>(
+                        <div key={r.id} style={{display:"flex",alignItems:"center",gap:16,padding:"12px 0",borderBottom:`1px solid ${T.g100}`}}>
+                          <span style={{fontFamily:T.serif,fontSize:18,fontWeight:300,color:T.g300,width:24,textAlign:"right",flexShrink:0}}>{i+1}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <p style={{fontFamily:T.sans,fontSize:13,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome}</p>
+                            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{r.peds} pedido{r.peds!==1?"s":""} · {fmt2(r.com)} de comissão</p>
+                          </div>
+                          <div style={{textAlign:"right",flexShrink:0}}>
+                            <p style={{fontFamily:T.serif,fontSize:20,fontWeight:300}}>{fmt2(r.fat)}</p>
+                          </div>
+                          <div style={{width:80,flexShrink:0}}>
+                            <div style={{height:4,background:T.g100,borderRadius:2}}>
+                              <div style={{height:"100%",width:Math.round((r.fat/dash.top10[0].fat)*100)+"%",background:T.black,borderRadius:2}}/>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {tab==="embaixadores"&&(
           <div className="fade-in">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:24,gap:12,flexWrap:"wrap"}}>
@@ -1734,6 +1978,7 @@ function PageAdmin({ user, onLogout }) {
         {tab==="whatsapp" && (
           <PageWhatsApp embs={embs} />
         )}
+
       </Tabs>
 
 
@@ -1786,6 +2031,7 @@ function PageAdmin({ user, onLogout }) {
           </div>
         </div>
       )}
+
       </div>
     </div>
   );
