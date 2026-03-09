@@ -246,26 +246,26 @@ function Tabs({ tabs, labels, active, onChange, children }) {
   return (
     <div style={{display:"flex",minHeight:"60vh",position:"relative"}}>
 
-      {/* Sidebar collapsed icon */}
-      {!open && (
-        <div style={{width:40,flexShrink:0,borderRight:"1px solid "+T.g200,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:4}}>
-          <button onClick={function(){ setOpen(true); }}
-            title="Abrir menu"
-            style={{background:"transparent",border:"none",cursor:"pointer",padding:"10px 0",display:"flex",flexDirection:"column",gap:4,alignItems:"center"}}>
-            <span style={{display:"block",width:16,height:1.5,background:T.black}}/>
-            <span style={{display:"block",width:16,height:1.5,background:T.black}}/>
-            <span style={{display:"block",width:16,height:1.5,background:T.black}}/>
-          </button>
-          {/* Rotated active label */}
-          <p style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",color:T.g400,writingMode:"vertical-rl",transform:"rotate(180deg)",marginTop:12,whiteSpace:"nowrap"}}>{activeLabel}</p>
-        </div>
+      {/* Backdrop behind sidebar — z-index BELOW sidebar */}
+      {open && (
+        <div style={{position:"fixed",inset:0,zIndex:98,background:"rgba(0,0,0,0.08)"}} onClick={function(){ setOpen(false); }}/>
       )}
 
-      {/* Sidebar expanded */}
-      {open && (
-        <>
-          <div style={{width:SIDEBAR_W,flexShrink:0,borderRight:"1px solid "+T.g200,paddingTop:4}}>
-            {/* Close button */}
+      {/* Sidebar — always above backdrop */}
+      <div style={{width:open?SIDEBAR_W:40,flexShrink:0,borderRight:"1px solid "+T.g200,position:"relative",zIndex:99,background:T.white,transition:"width 0.2s",overflow:"hidden"}}>
+        {!open ? (
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:4}}>
+            <button onClick={function(){ setOpen(true); }}
+              title="Abrir menu"
+              style={{background:"transparent",border:"none",cursor:"pointer",padding:"10px 0",display:"flex",flexDirection:"column",gap:4,alignItems:"center"}}>
+              <span style={{display:"block",width:16,height:1.5,background:T.black}}/>
+              <span style={{display:"block",width:16,height:1.5,background:T.black}}/>
+              <span style={{display:"block",width:16,height:1.5,background:T.black}}/>
+            </button>
+            <p style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",color:T.g400,writingMode:"vertical-rl",transform:"rotate(180deg)",marginTop:12,whiteSpace:"nowrap"}}>{activeLabel}</p>
+          </div>
+        ) : (
+          <div style={{minWidth:SIDEBAR_W,paddingTop:4}}>
             <button onClick={function(){ setOpen(false); }}
               style={{background:"transparent",border:"none",cursor:"pointer",padding:"10px 16px",display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
               <span style={{fontFamily:T.sans,fontSize:18,lineHeight:1,color:T.black}}>&#8592;</span>
@@ -280,13 +280,11 @@ function Tabs({ tabs, labels, active, onChange, children }) {
               );
             })}
           </div>
-          {/* Backdrop */}
-          <div style={{position:"fixed",inset:0,zIndex:98,background:"rgba(0,0,0,0.08)"}} onClick={function(){ setOpen(false); }}/>
-        </>
-      )}
+        )}
+      </div>
 
       {/* Content */}
-      <div style={{flex:1,paddingLeft:open?32:24,paddingRight:0,minWidth:0}}>
+      <div style={{flex:1,paddingLeft:24,paddingRight:0,minWidth:0}}>
         {children}
       </div>
     </div>
