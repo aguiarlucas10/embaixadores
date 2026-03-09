@@ -76,7 +76,6 @@ const CONFIG = {
   COMISSAO_PCT:        0.10,
   JANELA_DEVOLUCAO:    7,
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
-
 };
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -119,7 +118,7 @@ const NS = {
 };
 
 // -- HELPERS ------------------------------------------------------------------
-const gerarCupomBase = n => "SG" + n.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"").slice(0,10);
+const gerarCupomBase = n => "SGB" + n.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"").slice(0,9);
 const gerarCupom = (n, sufixo="") => {
   const base = gerarCupomBase(n);
   if (!sufixo) return base;
@@ -296,11 +295,11 @@ function PageCadastro({ onNavigate }) {
     const primeiro = nomePartes[0] || "";
     const ultimo = nomePartes[nomePartes.length - 1] || "";
     const opcoes = new Set();
-    opcoes.add(base); // SGLUCASAGUIA
-    if (primeiro) opcoes.add(("SG" + primeiro).slice(0,12)); // SGLUCAS
-    if (ultimo && ultimo !== primeiro) opcoes.add(("SG" + ultimo).slice(0,12)); // SGAGUIA
-    if (primeiro && ultimo && primeiro !== ultimo) opcoes.add(("SG" + primeiro + ultimo).slice(0,12)); // SGLUCASAGUIA (já tem)
-    if (primeiro) opcoes.add(("SG" + primeiro + new Date().getFullYear().toString().slice(2)).slice(0,12)); // SGLUCAS26
+    opcoes.add(base); // SGBLUCASAGUIA
+    if (primeiro) opcoes.add(("SGB" + primeiro).slice(0,12)); // SGBLUCAS
+    if (ultimo && ultimo !== primeiro) opcoes.add(("SGB" + ultimo).slice(0,12)); // SGBAGUIA
+    if (primeiro && ultimo && primeiro !== ultimo) opcoes.add(("SGB" + primeiro + ultimo).slice(0,12)); // SGBLUCASAGUIA
+    if (primeiro) opcoes.add(("SGB" + primeiro + new Date().getFullYear().toString().slice(2)).slice(0,12)); // SGBLUCAS26
     return [...opcoes].slice(0,4);
   }
 
@@ -1889,6 +1888,50 @@ function PageWhatsApp({ embs }) {
   const [embSel, setEmbSel] = React.useState([]);
   const [sending, setSending] = React.useState(false);
   const [sendLog, setSendLog] = React.useState([]);
+  const [agendando, setAgendando] = React.useState(false);
+  const [agendado, setAgendado] = React.useState(null); // {date, time}
+  const [agendamentos, setAgendamentos] = React.useState([]);
+
+  React.useEffect(function(){ carregarAgendamentos(); }, []);
+
+  async function carregarAgendamentos() {
+    const { data } = await supabase
+      .from("agendamentos_disparo")
+      .select("*")
+      .eq("status","pendente")
+      .order("agendado_para", {ascending:true});
+    setAgendamentos(data||[]);
+  }
+
+  async function salvarAgendamento() {
+    if(!selectedTpl) { alert("Selecione um template."); return; }
+    if(!agendado || !agendado.date || !agendado.time) { alert("Selecione data e horario."); return; }
+    const lista = destinatarios();
+    if(!lista.length) { alert("Nenhum destinatario selecionado."); return; }
+    const datetime = new Date(agendado.date + "T" + agendado.time + ":00");
+    if(datetime <= new Date()) { alert("Selecione uma data e horario futuros."); return; }
+    const destinatariosJson = lista.map(function(e){ return {id:e.id, nome:e.nome, whatsapp:e.whatsapp, cupom:e.cupom||"", _estreia:e._estreia||false}; });
+    const { error } = await supabase.from("agendamentos_disparo").insert({
+      agendado_para: datetime.toISOString(),
+      template_name: selectedTpl.name,
+      template_language: selectedTpl.language,
+      destino: destino,
+      destinatarios: destinatariosJson,
+      total: lista.length,
+      status: "pendente"
+    });
+    if(error) { alert("Erro ao agendar: " + error.message); return; }
+    await carregarAgendamentos();
+    setAgendando(false);
+    setAgendado(null);
+    alert("Disparo agendado para " + datetime.toLocaleString("pt-BR") + " para " + lista.length + " destinatarios.");
+  }
+
+  async function cancelarAgendamento(id) {
+    if(!confirm("Cancelar este agendamento?")) return;
+    await supabase.from("agendamentos_disparo").update({status:"cancelado"}).eq("id",id);
+    await carregarAgendamentos();
+  }
   const [automacoes, setAutomacoes] = React.useState({
     novo_cadastro: { ativo: false, template: "" },
     marco_atingido: { ativo: false, template: "" },
@@ -2082,14 +2125,71 @@ function PageWhatsApp({ embs }) {
           </div>
         )}
 
-        <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:24}}>
-          <button onClick={disparar} disabled={sending}
-            style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 32px",background:sending?T.g200:T.black,color:T.white,border:"none",cursor:sending?"not-allowed":"pointer"}}>
-            {sending ? "Enviando..." : "Disparar agora"}
-          </button>
-          <span style={{fontFamily:T.sans,fontSize:12,color:T.g400}}>
-            {destinatarios().length} destinatário{destinatarios().length!==1?"s":""}
-          </span>
+        <div style={{marginBottom:24}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <button onClick={disparar} disabled={sending}
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 28px",background:sending?T.g200:T.black,color:T.white,border:"none",cursor:sending?"not-allowed":"pointer"}}>
+              {sending ? "Enviando..." : "Disparar agora"}
+            </button>
+            <button onClick={function(){ setAgendando(!agendando); setAgendado(null); }}
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 28px",background:"transparent",color:T.black,border:"1px solid "+T.black,cursor:"pointer"}}>
+              Agendar
+            </button>
+            <span style={{fontFamily:T.sans,fontSize:12,color:T.g400}}>
+              {destinatarios().length} destinatario{destinatarios().length!==1?"s":""}
+            </span>
+          </div>
+
+          {agendando && (
+            <div style={{border:"1px solid "+T.g200,padding:20,marginBottom:16}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:16}}>Agendar disparo</p>
+              <div style={{display:"flex",gap:16,alignItems:"flex-end",flexWrap:"wrap"}}>
+                <div>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>Data</p>
+                  <input type="date"
+                    min={new Date().toISOString().split("T")[0]}
+                    value={agendado ? agendado.date : ""}
+                    onChange={function(e){ setAgendado(function(p){ return {...(p||{}), date:e.target.value}; }); }}
+                    style={{fontFamily:T.sans,fontSize:13,padding:"10px 12px",border:"1px solid "+T.g200,background:T.white,cursor:"pointer"}}/>
+                </div>
+                <div>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>Horario</p>
+                  <input type="time"
+                    value={agendado ? agendado.time : ""}
+                    onChange={function(e){ setAgendado(function(p){ return {...(p||{}), time:e.target.value}; }); }}
+                    style={{fontFamily:T.sans,fontSize:13,padding:"10px 12px",border:"1px solid "+T.g200,background:T.white,cursor:"pointer"}}/>
+                </div>
+                <button onClick={salvarAgendamento}
+                  style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",background:T.black,color:T.white,border:"none",cursor:"pointer"}}>
+                  Confirmar agendamento
+                </button>
+                <button onClick={function(){ setAgendando(false); setAgendado(null); }}
+                  style={{fontFamily:T.sans,fontSize:11,color:T.g400,background:"transparent",border:"none",cursor:"pointer"}}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {agendamentos.length > 0 && (
+            <div style={{border:"1px solid "+T.g200,padding:20}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:12}}>Agendamentos pendentes</p>
+              {agendamentos.map(function(a){
+                return (
+                  <div key={a.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid "+T.g200}}>
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:13}}>{new Date(a.datetime).toLocaleString("pt-BR")}</p>
+                      <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>Template: {a.template} - {a.total} destinatario{a.total!==1?"s":""}</p>
+                    </div>
+                    <button onClick={function(){ cancelarAgendamento(a.id); }}
+                      style={{fontFamily:T.sans,fontSize:11,color:"#c00",background:"transparent",border:"none",cursor:"pointer"}}>
+                      Cancelar
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Log */}
