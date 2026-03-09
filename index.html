@@ -341,12 +341,12 @@ function LPMarquee() {
 
 function LPBenefits() {
   const items = [
-    { icon: "\ud83c\udff7️", title: "Cupom exclusivo", desc: "Seu código personalizado que oferece 10% de desconto para seus seguidores." },
-    { icon: "\ud83d\udcb8", title: "Comissão mensal", desc: "Ganhe 10% de comissão sobre cada venda realizada com seu cupom." },
-    { icon: "\ud83c\udf81", title: "Presentinhos VIP", desc: "Embaixadoras ativas recebem mimos e lançamentos exclusivos da Saint Germain." },
-    { icon: "⭐", title: "Visibilidade", desc: "Suas fotos e perfil podem ser repostados nos canais oficiais da marca." },
-    { icon: "\ud83d\udc65", title: "Comunidade", desc: "Acesso ao grupo exclusivo com outras embaixadoras e novidades em primeira mão." },
-    { icon: "\ud83d\udcc8", title: "Crescimento", desc: "Dicas de conteúdo e estratégias para você crescer como influenciadora." },
+    { num:"I",   title: "Cupom exclusivo",   desc: "Seu código personalizado que oferece 10% de desconto para seus seguidores." },
+    { num:"II",  title: "Comissão mensal",    desc: "Ganhe 10% de comissão sobre cada venda realizada com seu cupom." },
+    { num:"III", title: "Presentinhos VIP",   desc: "Embaixadoras ativas recebem mimos e lançamentos exclusivos da Saint Germain." },
+    { num:"IV",  title: "Visibilidade",       desc: "Suas fotos e perfil podem ser repostados nos canais oficiais da marca." },
+    { num:"V",   title: "Comunidade",         desc: "Acesso ao grupo exclusivo com outras embaixadoras e novidades em primeira mão." },
+    { num:"VI",  title: "Crescimento",        desc: "Dicas de conteúdo e estratégias para você crescer como influenciadora." },
   ];
   return (
     <section style={{background:"#f9f6f2",padding:"80px 24px"}}>
@@ -356,7 +356,7 @@ function LPBenefits() {
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
           {items.map((it,i) => (
             <div key={i} className="lp-benefit-card" style={{background:"#fff",padding:"36px 28px",borderBottom:"3px solid #000",transition:"transform 0.3s ease"}}>
-              <div style={{fontSize:28,marginBottom:16}}>{it.icon}</div>
+              <div style={{fontFamily:T.serif,fontSize:13,color:"rgba(0,0,0,0.18)",letterSpacing:"0.1em",marginBottom:20}}>{it.num}</div>
               <h3 style={{fontFamily:T.serif,fontSize:22,fontWeight:400,marginBottom:10}}>{it.title}</h3>
               <p style={{fontFamily:T.sans,fontSize:13,color:T.g500,lineHeight:1.8}}>{it.desc}</p>
             </div>
