@@ -495,7 +495,7 @@ function PageCadastro({ onNavigate }) {
       // Verifica cupons existentes na Nuvemshop antes de sugerir opções
       const opcoesTentativas = gerarOpcoes(f.nome);
       for (const cod of opcoesTentativas) {
-        const chk = await fetch(CONFIG.EDGE_URL + "?action=check_coupon&code=" + encodeURIComponent(cod));
+        const chk = await fetch(NS.proxy + "?action=check_coupon&code=" + encodeURIComponent(cod), { headers: NS.h });
         const chkJson = await chk.json();
         if (chkJson.exists) {
           setErr("Já existe um cupom cadastrado para esse perfil. Entre em contato com a Saint Germain.");
