@@ -88,7 +88,6 @@ const CONFIG = {
   JANELA_DEVOLUCAO:    7,
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
 
-
 };
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -342,18 +341,18 @@ function LPMarquee() {
 
 function LPBenefits() {
   const items = [
-    { icon: "\ud83c\udff7\ufe0f", title: "Cupom exclusivo", desc: "Seu codigo personalizado que oferece 10% de desconto para seus seguidores." },
-    { icon: "\ud83d\udcb8", title: "Comissao mensal", desc: "Ganhe 10% de comissao sobre cada venda realizada com seu cupom." },
-    { icon: "\ud83c\udf81", title: "Presentinhos VIP", desc: "Embaixadoras ativas recebem mimos e lancamentos exclusivos da Saint Germain." },
+    { icon: "\ud83c\udff7\ufe0f", title: "Cupom exclusivo", desc: "Seu c\u00f3digo personalizado que oferece 10% de desconto para seus seguidores." },
+    { icon: "\ud83d\udcb8", title: "Comiss\u00e3o mensal", desc: "Ganhe 10% de comiss\u00e3o sobre cada venda realizada com seu cupom." },
+    { icon: "\ud83c\udf81", title: "Presentinhos VIP", desc: "Embaixadoras ativas recebem mimos e lan\u00e7amentos exclusivos da Saint Germain." },
     { icon: "\u2b50", title: "Visibilidade", desc: "Suas fotos e perfil podem ser repostados nos canais oficiais da marca." },
-    { icon: "\ud83d\udc65", title: "Comunidade", desc: "Acesso ao grupo exclusivo com outras embaixadoras e novidades em primeira mao." },
-    { icon: "\ud83d\udcc8", title: "Crescimento", desc: "Dicas de conteudo e estrategias para voce crescer como influenciadora." },
+    { icon: "\ud83d\udc65", title: "Comunidade", desc: "Acesso ao grupo exclusivo com outras embaixadoras e novidades em primeira m\u00e3o." },
+    { icon: "\ud83d\udcc8", title: "Crescimento", desc: "Dicas de conte\u00fado e estrat\u00e9gias para voc\u00ea crescer como influenciadora." },
   ];
   return (
     <section style={{background:"#f9f6f2",padding:"80px 24px"}}>
       <div style={{maxWidth:1100,margin:"0 auto"}}>
         <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:T.g400,textAlign:"center",marginBottom:8}}>Por que ser embaixadora</p>
-        <h2 style={{fontFamily:T.serif,fontSize:"clamp(32px,5vw,54px)",fontWeight:400,textAlign:"center",lineHeight:1.1,marginBottom:56}}>O que voce <em>ganha?</em></h2>
+        <h2 style={{fontFamily:T.serif,fontSize:"clamp(32px,5vw,54px)",fontWeight:400,textAlign:"center",lineHeight:1.1,marginBottom:56}}>O que voc\u00ea <em>ganha?</em></h2>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
           {items.map((it,i) => (
             <div key={i} className="lp-benefit-card" style={{background:"#fff",padding:"36px 28px",borderBottom:"3px solid #000",transition:"transform 0.3s ease"}}>
@@ -370,10 +369,10 @@ function LPBenefits() {
 
 function LPHowItWorks() {
   const steps = [
-    { num:"01", title:"Cadastre-se", desc:"Preencha o formulario abaixo com seus dados. O programa e exclusivo para clientes que ja compraram na Saint Germain." },
-    { num:"02", title:"Escolha seu cupom", desc:"Voce cria o seu codigo personalizado. Ex: SGBSEUINSTAGRAM. Simples e unico." },
-    { num:"03", title:"Divulgue", desc:"Compartilhe seu cupom com amigas e seguidoras. Cada compra feita com ele conta para voce." },
-    { num:"04", title:"Receba", desc:"10% de comissao sobre cada pedido pago com seu cupom, depositado diretamente para voce. O pagamento dos resgates e realizado todo dia 20, consulte a politica no contrato." },
+    { num:"01", title:"Cadastre-se", desc:"Preencha o formul\u00e1rio abaixo com seus dados. O programa \u00e9 exclusivo para clientes que j\u00e1 compraram na Saint Germain." },
+    { num:"02", title:"Escolha seu cupom", desc:"Voc\u00ea cria o seu c\u00f3digo personalizado. Ex: SGBSEUINSTAGRAM. Simples e \u00fanico." },
+    { num:"03", title:"Divulgue", desc:"Compartilhe seu cupom com amigas e seguidoras. Cada compra feita com ele conta para voc\u00ea." },
+    { num:"04", title:"Receba", desc:"10% de comiss\u00e3o sobre cada pedido pago com seu cupom, depositado diretamente para voc\u00ea. O pagamento dos resgates \u00e9 realizado todo dia 20 \u2014 consulte a pol\u00edtica no contrato." },
   ];
   return (
     <section style={{background:"#fff",padding:"80px 24px"}}>
@@ -396,16 +395,16 @@ function LPHowItWorks() {
 
 function LPFAQ() {
   const items = [
-    { q:"Preciso ser influenciadora?", a:"Nao! O programa e para clientes que ja amam a Saint Germain. Nao importa o numero de seguidores. O que vale e o carinho pela marca." },
-    { q:"Preciso comprar produtos?", a:"Nao e necessario ter comprado recentemente. Verificamos apenas se voce ja e cliente. Se ainda nao e, faca sua primeira compra e depois se cadastre!" },
-    { q:"Como recebo a comissao?", a:"Apos o periodo de 7 dias de possivel devolucao, a comissao e contabilizada. Voce indica seu PIX no painel e realizamos o pagamento mensalmente." },
-    { q:"O desconto do cupom vale para mim tambem?", a:"Sim! Seu cupom tambem da 10% de desconto para qualquer pessoa que usar, inclusive voce mesma em futuras compras." },
-    { q:"Posso ser embaixadora mesmo sem redes sociais?", a:"Sim! Voce pode indicar para amigas, familia ou qualquer pessoa. O cupom funciona para qualquer indicacao." },
+    { q:"Preciso ser influenciadora?", a:"N\u00e3o! O programa \u00e9 para clientes que j\u00e1 amam a Saint Germain. N\u00e3o importa o n\u00famero de seguidores. O que vale \u00e9 o carinho pela marca." },
+    { q:"Preciso comprar produtos?", a:"N\u00e3o \u00e9 necess\u00e1rio ter comprado recentemente. Verificamos apenas se voc\u00ea j\u00e1 \u00e9 cliente. Se ainda n\u00e3o \u00e9, fa\u00e7a sua primeira compra e depois se cadastre!" },
+    { q:"Como recebo a comiss\u00e3o?", a:"Ap\u00f3s o per\u00edodo de 7 dias de poss\u00edvel devolu\u00e7\u00e3o, a comiss\u00e3o \u00e9 contabilizada. Voc\u00ea indica seu PIX no painel e realizamos o pagamento mensalmente." },
+    { q:"O desconto do cupom vale para mim tamb\u00e9m?", a:"Sim! Seu cupom tamb\u00e9m d\u00e1 10% de desconto para qualquer pessoa que usar, inclusive voc\u00ea mesma em futuras compras." },
+    { q:"Posso ser embaixadora mesmo sem redes sociais?", a:"Sim! Voc\u00ea pode indicar para amigas, fam\u00edlia ou qualquer pessoa. O cupom funciona para qualquer indica\u00e7\u00e3o." },
   ];
   return (
     <section style={{background:"#f9f6f2",padding:"80px 24px"}}>
       <div style={{maxWidth:720,margin:"0 auto"}}>
-        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:T.g400,textAlign:"center",marginBottom:8}}>Duvidas frequentes</p>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:T.g400,textAlign:"center",marginBottom:8}}>D\u00favidas frequentes</p>
         <h2 style={{fontFamily:T.serif,fontSize:"clamp(32px,5vw,54px)",fontWeight:400,textAlign:"center",lineHeight:1.1,marginBottom:48}}>FAQ</h2>
         <div style={{display:"flex",flexDirection:"column",gap:0}}>
           {items.map((it,i) => (
@@ -555,17 +554,17 @@ function PageCadastro({ onNavigate }) {
       </header>
       <div style={{maxWidth:480,margin:"0 auto",padding:"72px 24px"}} className="stagger">
         <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:32}}>Bem-vindo ao time</p>
-        <h1 style={{fontFamily:T.serif,fontSize:48,fontWeight:300,lineHeight:1.1,marginBottom:32,color:"#fff"}}>Voce agora e<br/>Embaixadora<br/><em>Saint Germain.</em></h1>
+        <h1 style={{fontFamily:T.serif,fontSize:48,fontWeight:300,lineHeight:1.1,marginBottom:32,color:"#fff"}}>Voc\u00ea agora \u00e9<br/>Embaixadora<br/><em>Saint Germain.</em></h1>
         <div style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",padding:"24px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,marginBottom:40}}>
           <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)"}}>Seu cupom exclusivo</span>
           <span style={{fontFamily:T.sans,fontSize:30,letterSpacing:"0.25em",color:"#fff"}}>{cupomFinal}</span>
-          <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:"rgba(255,255,255,0.35)",marginTop:2}}>{(CONFIG.COMISSAO_PCT*100).toFixed(0)}% desconto - {(CONFIG.COMISSAO_PCT*100).toFixed(0)}% comissao por venda</span>
+          <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:"rgba(255,255,255,0.35)",marginTop:2}}>{(CONFIG.COMISSAO_PCT*100).toFixed(0)}% desconto \u2014 {(CONFIG.COMISSAO_PCT*100).toFixed(0)}% comiss\u00e3o por venda</span>
         </div>
         <div style={{borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:32,marginBottom:32}}>
           <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:24,color:"rgba(255,255,255,0.4)"}}>Crie sua senha de acesso</p>
           <div style={{display:"flex",flexDirection:"column",gap:24,marginBottom:24}}>
             {[
-              {label:"Senha *",val:senha,set:setSenha,type:"password",ph:"Minimo 6 caracteres"},
+              {label:"Senha *",val:senha,set:setSenha,type:"password",ph:"M\u00ednimo 6 caracteres"},
               {label:"Confirmar senha *",val:senhaConfirm,set:setSenhaConfirm,type:"password",ph:""},
             ].map(function(fi,i){
               return (
@@ -587,7 +586,7 @@ function PageCadastro({ onNavigate }) {
               : "Acessar meu painel"}
           </button>
         </div>
-        <p style={{fontFamily:T.sans,fontSize:12,color:"rgba(255,255,255,0.28)",lineHeight:1.8}}>Em breve voce recebera uma mensagem com os detalhes do programa e acesso ao grupo exclusivo.</p>
+        <p style={{fontFamily:T.sans,fontSize:12,color:"rgba(255,255,255,0.28)",lineHeight:1.8}}>Em breve voc\u00ea receber\u00e1 uma mensagem com os detalhes do programa e acesso ao grupo exclusivo.</p>
       </div>
     </div>
   );
@@ -599,9 +598,9 @@ function PageCadastro({ onNavigate }) {
         <div style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.28em",textTransform:"uppercase",color:"#fff"}}>Saint Germain</div>
       </header>
       <div style={{maxWidth:520,margin:"0 auto",padding:"72px 24px"}} className="stagger">
-        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)",marginBottom:12}}>Quase la</p>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)",marginBottom:12}}>Quase l\u00e1</p>
         <h1 style={{fontFamily:T.serif,fontSize:42,fontWeight:300,lineHeight:1.1,marginBottom:12,color:"#fff"}}>Escolha seu<br/><em>cupom exclusivo.</em></h1>
-        <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.4)",lineHeight:1.8,marginBottom:40}}>Este sera o codigo que seus seguidores usam para ganhar desconto e voce ganha comissao em cada venda.</p>
+        <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.4)",lineHeight:1.8,marginBottom:40}}>Este ser\u00e1 o c\u00f3digo que seus seguidores usam para ganhar desconto \u2014 e voc\u00ea ganha comiss\u00e3o em cada venda.</p>
 
         <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:40}}>
           {opcoesCupom.map(function(op){
@@ -670,7 +669,7 @@ function PageCadastro({ onNavigate }) {
             Clientes<br/><em style={{fontStyle:"italic",color:"rgba(255,255,255,0.7)"}}>Embaixadoras</em><br/>Saint Germain.
           </h1>
           <p className="lp-hero-sub" style={{fontFamily:T.sans,fontSize:"clamp(12px,1.4vw,14px)",color:"rgba(255,255,255,0.5)",lineHeight:1.8,maxWidth:420,marginBottom:32}}>
-            Transforme seu amor pela marca em recompensas reais. Cupom exclusivo, comissoes mensais e beneficios para quem ja faz parte da historia da Saint Germain.
+            Transforme seu amor pela marca em recompensas reais. Cupom exclusivo, comiss\u00f5es mensais e benef\u00edcios para quem j\u00e1 faz parte da hist\u00f3ria da Saint Germain.
           </p>
           <div className="lp-hero-btn" style={{display:"flex",gap:12,flexWrap:"wrap"}}>
             <button onClick={function(){document.getElementById("sg-form-section").scrollIntoView({behavior:"smooth"});}}
@@ -705,14 +704,14 @@ function PageCadastro({ onNavigate }) {
           {/* Copy text */}
           <div style={{maxWidth:560,margin:"0 auto"}}>
             <h2 style={{fontFamily:T.serif,fontSize:"clamp(26px,3.5vw,40px)",fontWeight:400,lineHeight:1.2,marginBottom:24,textAlign:"center"}}>
-              O que muda quando<br/><em>voce entra.</em>
+              O que muda quando<br/><em>voc\u00ea entra.</em>
             </h2>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               {[
-                "Voce passa a conhecer os lancamentos antes de todo mundo.",
-                "Voce entra em um grupo seleto de pessoas que, assim como voce, escolheram a SG.",
-                "Voce e vista. Repostada. Reconhecida.",
-                "E cada vez que alguem compra pelo seu cupom, voce recebe tambem.",
+                "Voc\u00ea passa a conhecer os lan\u00e7amentos antes de todo mundo.",
+                "Voc\u00ea entra em um grupo seleto de pessoas que, assim como voc\u00ea, escolheram a SG.",
+                "Voc\u00ea \u00e9 vista. Repostada. Reconhecida.",
+                "E cada vez que algu\u00e9m compra pelo seu cupom, voc\u00ea recebe tamb\u00e9m.",
               ].map(function(line,i){
                 return (
                   <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12}}>
@@ -721,6 +720,12 @@ function PageCadastro({ onNavigate }) {
                   </div>
                 );
               })}
+            </div>
+            <div style={{textAlign:"center",marginTop:36}}>
+              <button onClick={function(){document.getElementById("sg-form-section").scrollIntoView({behavior:"smooth"});}}
+                style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",background:"#000",color:"#fff",border:"none",padding:"16px 40px",cursor:"pointer"}}>
+                Cadastre-se agora
+              </button>
             </div>
           </div>
         </div>
@@ -741,10 +746,10 @@ function PageCadastro({ onNavigate }) {
       <section style={{background:"#000",padding:"72px 24px",textAlign:"center"}}>
         <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:12}}>Exclusivo para clientes</p>
         <h2 style={{fontFamily:T.serif,fontSize:"clamp(28px,4vw,48px)",fontWeight:300,color:"#fff",lineHeight:1.2,marginBottom:28}}>
-          Nao e preciso ter seguidores.<br/><em>So precisa amar a Saint Germain.</em>
+          N\u00e3o \u00e9 preciso ter seguidores.<br/><em>S\u00f3 precisa amar a Saint Germain.</em>
         </h2>
         <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.45)",lineHeight:1.8,maxWidth:480,margin:"0 auto 36px"}}>
-          O programa e para quem ja comprou na nossa loja. Sem custo, sem burocracia. Voce indica, a gente acompanha e voce recebe.
+          O programa \u00e9 para quem j\u00e1 comprou na nossa loja. Sem custo, sem burocracia. Voc\u00ea indica, a gente acompanha e voc\u00ea recebe.
         </p>
         <button onClick={function(){document.getElementById("sg-form-section").scrollIntoView({behavior:"smooth"});}}
           style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"16px 40px",cursor:"pointer"}}>
@@ -763,7 +768,7 @@ function PageCadastro({ onNavigate }) {
             Pronta para<br/><em>entrar no time?</em>
           </h2>
           <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.4)",textAlign:"center",lineHeight:1.8,marginBottom:48}}>
-            Preencha os dados abaixo. Verificamos automaticamente se voce e cliente da Saint Germain.
+            Preencha os dados abaixo. Verificamos automaticamente se voc\u00ea \u00e9 cliente da Saint Germain.
           </p>
 
           {/* FORM */}
@@ -790,7 +795,7 @@ function PageCadastro({ onNavigate }) {
             <input type="checkbox" id="aceite-lp" checked={aceite} onChange={function(e){setAceite(e.target.checked);}}
               style={{width:14,height:14,marginTop:2,cursor:"pointer",flexShrink:0,accentColor:"#fff"}}/>
             <label htmlFor="aceite-lp" style={{fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.4)",lineHeight:1.7,cursor:"pointer"}}>
-              Aceito os termos do programa e autorizo o uso da minha imagem em publicacoes relacionadas ao programa Clientes Embaixadores da Saint Germain.
+              Aceito os termos do programa e autorizo o uso da minha imagem em publica\u00e7\u00f5es relacionadas ao programa Clientes Embaixadores da Saint Germain.
             </label>
           </div>
 
@@ -804,7 +809,7 @@ function PageCadastro({ onNavigate }) {
           </button>
 
           <p style={{fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.28)",marginTop:20,textAlign:"center"}}>
-            Ja e embaixadora?{" "}
+            J\u00e1 \u00e9 embaixadora?{" "}
             <button onClick={function(){onNavigate("login");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.55)",textDecoration:"underline"}}>
               Acesse seu painel
             </button>
@@ -828,16 +833,16 @@ function PageCadastro({ onNavigate }) {
             <div style={{marginTop:28,display:"flex",flexDirection:"column",gap:20,paddingBottom:8}}>
               {[
                 {
-                  titulo:"Proibido comentarios com cupons",
-                  texto:"E vedado comentar seus cupons em publicacoes oficiais da nossa marca, ou de nossos seguidores."
+                  titulo:"Proibido coment\u00e1rios com cupons",
+                  texto:"\u00c9 vedado comentar seus cupons em publica\u00e7\u00f5es oficiais da nossa marca, ou de nossos seguidores."
                 },
                 {
                   titulo:"Compartilhamento privado indevido",
-                  texto:"O envio de cupons por mensagem privada para nossos clientes e seguidores tambem nao e permitido."
+                  texto:"O envio de cupons por mensagem privada para nossos clientes e seguidores tamb\u00e9m n\u00e3o \u00e9 permitido."
                 },
                 {
-                  titulo:"Criacao de contas somente para divulgacao",
-                  texto:"A criacao de contas com o unico proposito de divulgar cupons e estritamente proibida."
+                  titulo:"Cria\u00e7\u00e3o de contas somente para divulga\u00e7\u00e3o",
+                  texto:"A cria\u00e7\u00e3o de contas com o \u00fanico prop\u00f3sito de divulgar cupons \u00e9 estritamente proibida."
                 },
               ].map(function(r,i){
                 return (
@@ -852,7 +857,7 @@ function PageCadastro({ onNavigate }) {
               })}
 
               <p style={{fontFamily:T.sans,fontSize:10,color:"rgba(255,255,255,0.15)",lineHeight:1.8,marginTop:4}}>
-                O descumprimento dessas regras pode resultar no cancelamento do cupom e desligamento do programa, sem direito a comissoes pendentes. Consulte o contrato completo para todas as condições.
+                O descumprimento dessas regras pode resultar no cancelamento do cupom e desligamento do programa, sem direito a comiss\u00f5es pendentes. Consulte o contrato completo para todas as condi\u00e7\u00f5es.
               </p>
             </div>
           </details>
