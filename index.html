@@ -1035,11 +1035,16 @@ function PagePainel({ user, onLogout }) {
   async function resgatar() {
     const saldo = cs.filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+c.valor_comissao,0);
     if(saldo<=0){ setMsgR({text:"Nenhum saldo disponível para resgate.",ok:false}); return; }
-    if(fResgate.tipo==="pix"&&!fResgate.pix){ setMsgR({text:"Informe a chave Pix.",ok:false}); return; }
+    if(saldo<100){ setMsgR({text:"O valor mínimo para solicitar resgate é R$ 100,00. Continue acumulando!",ok:false}); return; }
+    const hoje = new Date();
+    if(hoje.getDate()>10){ setMsgR({text:"As solicitações de resgate devem ser feitas até o dia 10 de cada mês. O próximo prazo é dia 10/"+(hoje.getMonth()===11?"01":String(hoje.getMonth()+2).padStart(2,"0"))+".",ok:false}); return; }
+    if(!emb.pix_key){ setMsgR({text:"Cadastre sua chave Pix na aba Perfil antes de solicitar o resgate.",ok:false}); return; }
+    if(fResgate.tipo==="pix"&&!fResgate.pix&&!emb.pix_key){ setMsgR({text:"Informe a chave Pix.",ok:false}); return; }
     setResgatando(true);
-    await supabase.from("resgates").insert({embaixador_id:emb.id,valor:saldo,tipo:fResgate.tipo,pix_key:fResgate.tipo==="pix"?fResgate.pix:null,status:"solicitado",criado_em:new Date().toISOString()});
+    const pixUsada = fResgate.tipo==="pix" ? (fResgate.pix||emb.pix_key) : null;
+    await supabase.from("resgates").insert({embaixador_id:emb.id,valor:saldo,tipo:fResgate.tipo,pix_key:pixUsada,status:"solicitado",criado_em:new Date().toISOString()});
     await supabase.from("comissoes").update({resgatada:true}).eq("embaixador_id",emb.id).eq("status","confirmada").is("resgatada",null);
-    setMsgR({text:"Resgate solicitado! O time entrará em contato em breve.",ok:true});
+    setMsgR({text:"Resgate de "+brl(saldo)+" solicitado com sucesso! O pagamento será realizado até o dia 20 deste mês.",ok:true});
     await load(); setResgatando(false);
   }
 
@@ -1175,12 +1180,51 @@ function PagePainel({ user, onLogout }) {
         {/* TAB RESGATAR */}
         {tab==="resgatar" && (
           <div className="fade-in">
-            <div style={{marginBottom:40}}>
-              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:8}}>Saldo disponível</p>
+            {/* Saldo e regras */}
+            <div style={{marginBottom:32}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:8}}>Saldo disponível para resgate</p>
               <p style={{fontFamily:T.serif,fontSize:64,fontWeight:300,lineHeight:1,marginBottom:4}}>{brl(saldoDisp)}</p>
-              {saldoPend>0&&<p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{brl(saldoPend)} pendente — aguardando prazo de devolução</p>}
+              {saldoPend>0&&<p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:4}}>{brl(saldoPend)} pendente — aguardando prazo de devolução</p>}
             </div>
-            {saldoDisp>0&&(
+
+            {/* Info box regras */}
+            <div style={{background:"#f9f6f2",padding:"20px 24px",marginBottom:36,borderLeft:"3px solid #000"}}>
+              <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:10}}>Como funciona o resgate</p>
+              <p style={{fontFamily:T.sans,fontSize:12,color:T.g500,lineHeight:1.9}}>
+                — Solicitações aceitas até o <strong>dia 10</strong> de cada mês<br/>
+                — Pagamento realizado até o <strong>dia 20</strong> do mesmo mês<br/>
+                — Valor mínimo para resgate: <strong>R$ 100,00</strong><br/>
+                — Quem não solicitar acumula o saldo para o mês seguinte<br/>
+                — Também é possível trocar por crédito na loja
+              </p>
+            </div>
+
+            {/* Aviso: sem pix cadastrado */}
+            {!emb.pix_key && (
+              <div style={{marginBottom:32}}>
+                <Alert msg="Cadastre sua chave Pix na aba Perfil para habilitar o resgate."/>
+                <button onClick={()=>setTab("perfil")} style={{marginTop:12,fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:`1px solid ${T.black}`,padding:"10px 24px",cursor:"pointer"}}>
+                  Ir para Perfil →
+                </button>
+              </div>
+            )}
+
+            {/* Aviso: saldo abaixo do mínimo */}
+            {emb.pix_key && saldoDisp>0 && saldoDisp<100 && (
+              <div style={{marginBottom:32}}>
+                <Alert msg={"Saldo atual de "+brl(saldoDisp)+" ainda não atingiu o mínimo de R$ 100,00. Continue acumulando!"}/>
+              </div>
+            )}
+
+            {/* Aviso: fora do prazo */}
+            {emb.pix_key && saldoDisp>=100 && new Date().getDate()>10 && (
+              <div style={{marginBottom:32}}>
+                <Alert msg={"O prazo de solicitação (até dia 10) encerrou para este mês. Seu saldo de "+brl(saldoDisp)+" será acumulado para o próximo ciclo."}/>
+              </div>
+            )}
+
+            {/* Formulário de resgate - só aparece se tudo OK */}
+            {emb.pix_key && saldoDisp>=100 && new Date().getDate()<=10 && (
               <div style={{maxWidth:400,marginBottom:48}}>
                 <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Forma de resgate</p>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",border:`1px solid ${T.black}`,marginBottom:28}}>
@@ -1191,18 +1235,28 @@ function PagePainel({ user, onLogout }) {
                     </button>
                   ))}
                 </div>
-                {fResgate.tipo==="pix"&&<div style={{marginBottom:28}}><Input label="Chave Pix" value={fResgate.pix} onChange={e=>setFResgate(p=>({...p,pix:e.target.value}))} placeholder="CPF, e-mail, telefone ou chave aleatória"/></div>}
+                {fResgate.tipo==="pix" && (
+                  <div style={{marginBottom:16,padding:"12px 16px",background:"#f9f6f2"}}>
+                    <p style={{fontFamily:T.sans,fontSize:11,color:T.g500}}>Chave Pix cadastrada: <strong style={{color:T.black}}>{emb.pix_key}</strong></p>
+                    <button onClick={()=>setTab("perfil")} style={{marginTop:4,fontFamily:T.sans,fontSize:10,color:T.g400,background:"none",border:"none",cursor:"pointer",textDecoration:"underline",padding:0}}>Alterar no Perfil</button>
+                  </div>
+                )}
+                <div style={{marginBottom:28,padding:"12px 16px",background:"#f0f0f0"}}>
+                  <p style={{fontFamily:T.sans,fontSize:11,color:T.g500}}>Valor a resgatar: <strong style={{fontFamily:T.serif,fontSize:16,color:T.black}}>{brl(saldoDisp)}</strong></p>
+                </div>
                 {msgR.text&&<div style={{marginBottom:24}}><Alert msg={msgR.text} ok={msgR.ok}/></div>}
-                <BtnPrimary onClick={resgatar} loading={resgatando}>Solicitar {brl(saldoDisp)}</BtnPrimary>
-                <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:12}}>Processado em até 5 dias úteis.</p>
+                <BtnPrimary onClick={resgatar} loading={resgatando}>Solicitar resgate de {brl(saldoDisp)}</BtnPrimary>
+                <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:12,lineHeight:1.8}}>Pagamento até o dia 20 deste mês.</p>
               </div>
             )}
+
+            {/* Histórico de resgates */}
             {rs.length>0&&(
               <div>
                 <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>Histórico de resgates</p>
                 {rs.map(r=>(
                   <Row key={r.id}
-                    left={<div><p style={{fontFamily:T.sans,fontSize:13}}>{r.tipo==="pix"?"Pix":"Crédito na loja"}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{fmt(r.criado_em)}</p></div>}
+                    left={<div><p style={{fontFamily:T.sans,fontSize:13}}>{r.tipo==="pix"?"Pix — "+r.pix_key:"Crédito na loja"}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{fmt(r.criado_em)}</p></div>}
                     right={<div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}><p style={{fontFamily:T.serif,fontSize:22,fontWeight:300}}>{brl(r.valor)}</p><Badge text={bResgate[r.status]?.[1]||r.status} color={bResgate[r.status]?.[0]||T.black}/></div>}
                   />
                 ))}
@@ -1287,6 +1341,7 @@ function PagePainel({ user, onLogout }) {
 function PageAdmin({ user, onLogout }) {
   const [embs, setEmbs] = React.useState([]);
   const [ress, setRess] = React.useState([]);
+  const [todosResgates, setTodosResgates] = React.useState([]);
   const [fila, setFila] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [tab, setTab] = React.useState("embaixadores");
@@ -1310,15 +1365,17 @@ function PageAdmin({ user, onLogout }) {
     setLoading(true);
     const {data:e}=await supabase.from("embaixadores").select("*, comissoes(valor_comissao,status,resgatada)").order("criado_em",{ascending:false});
     setEmbs(e||[]);
-    const {data:r}=await supabase.from("resgates").select("*, embaixadores(nome,email,cupom)").eq("status","solicitado").order("criado_em",{ascending:false});
+    const {data:r}=await supabase.from("resgates").select("*, embaixadores(nome,email,cupom,pix_key)").eq("status","solicitado").order("criado_em",{ascending:false});
     setRess(r||[]);
     const ontem=new Date(Date.now()-86400000).toISOString();
     const {data:novos}=await supabase.from("embaixadores").select("id,nome,whatsapp,cupom,criado_em").gte("criado_em",ontem);
     const t30=new Date(Date.now()-30*86400000).toISOString();
     const {data:inat}=await supabase.from("embaixadores").select("id,nome,whatsapp,cupom,ultimo_acesso").lt("ultimo_acesso",t30).eq("status","ativo");
     setFila([...(novos||[]).map(x=>({...x,motivo:"Novo cadastro — boas-vindas",p:"alta"})),...(inat||[]).map(x=>({...x,motivo:"Inativo +30d — reengajar",p:"media"}))]);
+    // Carrega TODOS os resgates para aba financeiro
+    const {data:todosR}=await supabase.from("resgates").select("*, embaixadores(nome,email,cupom,pix_key)").order("criado_em",{ascending:false});
+    setTodosResgates(todosR||[]);
     setLoading(false);
-    // Carrega banner atual
     const {data:b} = await supabase.from("config").select("valor").eq("chave","banner_ativo").maybeSingle();
     if(b?.valor) setBanner(b.valor);
     const {data:gl} = await supabase.from("config").select("valor").eq("chave","grupo_vip_link").maybeSingle();
@@ -1381,6 +1438,31 @@ function PageAdmin({ user, onLogout }) {
     URL.revokeObjectURL(url);
   }
 
+  function exportarFinanceiroCSV() {
+    const cols = ["Data Solicitacao","Nome","Email","Cupom","Chave Pix","Tipo","Valor","Status"];
+    const lines = [cols.join(",")];
+    todosResgates.forEach(function(r) {
+      const emb = r.embaixadores || {};
+      const vals = [
+        new Date(r.criado_em).toLocaleDateString("pt-BR"),
+        emb.nome || "", emb.email || "", emb.cupom || "",
+        r.pix_key || emb.pix_key || "",
+        r.tipo === "pix" ? "Pix" : "Credito na loja",
+        String(r.valor || "0").replace(".",","),
+        r.status
+      ];
+      lines.push(vals.map(v=>String(v||"").replace(/"/g,"")).join(","));
+    });
+    const csv = "\uFEFF" + lines.join("\n"); // BOM para Excel reconhecer UTF-8
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "resgates_financeiro_sg.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
 
   async function salvarEdicao() {
     if(!editEmb) return;
@@ -1426,7 +1508,7 @@ function PageAdmin({ user, onLogout }) {
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
 
-        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp","chat","importar","estreia"]} labels={{embaixadores:"Embaixadores ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar",estreia:"Pre-estreia"}} active={tab} onChange={setTab}>
+        <Tabs tabs={["embaixadores","resgates","financeiro","fila","ranking","banner","whatsapp","chat","importar","estreia"]} labels={{embaixadores:"Embaixadores ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),financeiro:"Financeiro",fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar",estreia:"Pre-estreia"}} active={tab} onChange={setTab}>
 
         {/* TAB EMBAIXADORES */}
         {tab==="embaixadores"&&(
@@ -1476,6 +1558,61 @@ function PageAdmin({ user, onLogout }) {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* TAB FINANCEIRO */}
+        {tab==="financeiro"&&(
+          <div className="fade-in">
+            {/* Resumo do mês */}
+            {(()=>{
+              const mesAtual = new Date().getMonth();
+              const anoAtual = new Date().getFullYear();
+              const doMes = todosResgates.filter(r=>{
+                const d = new Date(r.criado_em);
+                return d.getMonth()===mesAtual && d.getFullYear()===anoAtual;
+              });
+              const totalMes = doMes.reduce((s,r)=>s+(r.valor||0),0);
+              const pendentes = doMes.filter(r=>r.status==="solicitado");
+              const pagos = todosResgates.filter(r=>r.status==="pago");
+              const totalPago = pagos.reduce((s,r)=>s+(r.valor||0),0);
+              return (
+                <StatGrid items={[
+                  [brl(totalMes), "Solicitado este mês"],
+                  [pendentes.length, "Aguardando pagamento"],
+                  [brl(totalPago), "Total já pago (histórico)"],
+                  [todosResgates.length, "Resgates no total"]
+                ]} cols={4}/>
+              );
+            })()}
+
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,marginTop:32}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase"}}>Todos os resgates</p>
+              <button onClick={exportarFinanceiroCSV}
+                style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",background:T.black,color:T.white,border:"none",padding:"10px 20px",cursor:"pointer"}}>
+                ↓ Exportar CSV
+              </button>
+            </div>
+
+            {todosResgates.length===0
+              ? <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhum resgate registrado ainda.</p>
+              : todosResgates.map(r=>(
+                <div key={r.id} style={{borderBottom:`1px solid ${T.g200}`,padding:"16px 0",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
+                  <div style={{flex:1}}>
+                    <p style={{fontFamily:T.sans,fontSize:13,marginBottom:2}}>{r.embaixadores?.nome}</p>
+                    <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{r.embaixadores?.email} · {r.embaixadores?.cupom}</p>
+                    <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{fmt(r.criado_em)} · {r.tipo==="pix"?"Pix: "+(r.pix_key||r.embaixadores?.pix_key||"—"):"Crédito na loja"}</p>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <p style={{fontFamily:T.serif,fontSize:22,fontWeight:300,marginBottom:4}}>{brl(r.valor)}</p>
+                    <Badge
+                      text={{solicitado:"Solicitado",aprovado:"Aprovado",pago:"Pago",recusado:"Recusado"}[r.status]||r.status}
+                      color={{solicitado:T.g400,aprovado:"#000",pago:"#000",recusado:"#c00"}[r.status]||T.g400}
+                    />
+                  </div>
+                </div>
+              ))
+            }
           </div>
         )}
 
