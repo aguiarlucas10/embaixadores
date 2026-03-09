@@ -36,7 +36,7 @@
     ::-webkit-scrollbar-track { background: #fff; }
     ::-webkit-scrollbar-thumb { background: #d0d0d0; }
   
-  /* ── MOBILE ────────────────────────────────────────────────── */
+  /* -- MOBILE -------------------------------------------------- */
   @media (max-width: 768px) {
     .split-layout { grid-template-columns: 1fr !important; }
     .split-left { display: none !important; }
@@ -63,7 +63,7 @@
 <div id="root"></div>
 <script type="text/babel">
 
-// ── CONFIG ──────────────────────────────────────────────────────────────────
+// -- CONFIG ------------------------------------------------------------------
 const CONFIG = {
   SUPABASE_URL:        "https://fsfqnshkfwnfeswwdmxg.supabase.co",
   SUPABASE_ANON_KEY:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnFuc2hrZnduZmVzd3dkbXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MzcxNDAsImV4cCI6MjA4ODMxMzE0MH0.XO5JpNdnu03tRLGUsisi3I_lTZHcMwhJMlw9VBrXkK8",
@@ -77,10 +77,11 @@ const CONFIG = {
   JANELA_DEVOLUCAO:    7,
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
 
+};
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
-// ── NUVEMSHOP API via Supabase Edge Function (proxy) ─────────────────────────
+// -- NUVEMSHOP API via Supabase Edge Function (proxy) -------------------------
 // As chamadas vão para: {SUPABASE_URL}/functions/v1/bright-api?action=...
 // Isso evita bloqueio de CORS ao chamar a API da Nuvemshop direto do browser.
 const NS = {
@@ -117,7 +118,7 @@ const NS = {
   },
 };
 
-// ── HELPERS ──────────────────────────────────────────────────────────────────
+// -- HELPERS ------------------------------------------------------------------
 const gerarCupomBase = n => "SG" + n.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"").slice(0,10);
 const gerarCupom = (n, sufixo="") => {
   const base = gerarCupomBase(n);
@@ -129,7 +130,7 @@ const brl = v => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}
 const fmt = s => new Date(s).toLocaleDateString("pt-BR");
 const diasPassados = (d,n) => (Date.now()-new Date(d).getTime())/86400000>=n;
 
-// ── DESIGN TOKENS ────────────────────────────────────────────────────────────
+// -- DESIGN TOKENS ------------------------------------------------------------
 const T = {
   serif: "'Cormorant Garamond', serif",
   sans:  "'Questrial', sans-serif",
@@ -143,7 +144,7 @@ const T = {
   g600: "#404040",
 };
 
-// ── ATOMS ────────────────────────────────────────────────────────────────────
+// -- ATOMS --------------------------------------------------------------------
 
 function Logo({ sub=true }) {
   return (
@@ -254,7 +255,7 @@ function TextLink({ children, onClick }) {
   return <button onClick={onClick} style={{background:"none",border:"none",cursor:"pointer",fontFamily:T.sans,fontSize:11,textDecoration:"underline",color:T.black}}>{children}</button>;
 }
 
-// ── SPLIT LAYOUT ─────────────────────────────────────────────────────────────
+// -- SPLIT LAYOUT -------------------------------------------------------------
 function SplitLayout({ left, right }) {
   return (
     <div className="split-layout" style={{display:"grid",gridTemplateColumns:"1fr 1fr",minHeight:"calc(100vh - 64px)"}}>
@@ -272,7 +273,7 @@ function SplitLayout({ left, right }) {
   );
 }
 
-// ── PAGE: CADASTRO ──────────────────────────────────────────────────────────
+// -- PAGE: CADASTRO ----------------------------------------------------------
 function PageCadastro({ onNavigate }) {
   const [f, setF] = React.useState({nome:"",email:"",cpf:"",whatsapp:"",instagram:"",tiktok:""});
   const [aceite, setAceite] = React.useState(false);
@@ -396,7 +397,7 @@ function PageCadastro({ onNavigate }) {
     setLoadingFinalizar(false);
   }
 
-  // ── TELA SUCESSO + CRIAR SENHA ───────────────────────────────────────────
+  // -- TELA SUCESSO + CRIAR SENHA -------------------------------------------
   if (etapa === "sucesso") return (
     <div style={{minHeight:"100vh",background:T.white}}>
       <Header/>
@@ -422,7 +423,7 @@ function PageCadastro({ onNavigate }) {
     </div>
   );
 
-  // ── TELA ESCOLHA DO CUPOM ────────────────────────────────────────────────
+  // -- TELA ESCOLHA DO CUPOM ------------------------------------------------
   if (etapa === "cupom") return (
     <div style={{minHeight:"100vh",background:T.white}}>
       <Header/>
@@ -459,7 +460,7 @@ function PageCadastro({ onNavigate }) {
     </div>
   );
 
-  // ── TELA FORMULÁRIO ──────────────────────────────────────────────────────
+  // -- TELA FORMULÁRIO ------------------------------------------------------
   return (
     <div style={{minHeight:"100vh",background:T.white}}>
       <Header/>
@@ -499,7 +500,7 @@ function PageCadastro({ onNavigate }) {
   );
 }
 
-// ── PAGE: LOGIN ───────────────────────────────────────────────────────────────
+// -- PAGE: LOGIN ---------------------------------------------------------------
 function PageLogin({ onLogin, onNavigate }) {
   const [email, setEmail] = React.useState("");
   const [senha, setSenha] = React.useState("");
@@ -540,7 +541,7 @@ function PageLogin({ onLogin, onNavigate }) {
   );
 }
 
-// ── PAGE: PAINEL ──────────────────────────────────────────────────────────────
+// -- PAGE: PAINEL --------------------------------------------------------------
 function PagePainel({ user, onLogout }) {
   const [emb, setEmb] = React.useState(null);
   const [cs, setCs] = React.useState([]);
@@ -858,7 +859,7 @@ function PagePainel({ user, onLogout }) {
   );
 }
 
-// ── PAGE: ADMIN ───────────────────────────────────────────────────────────────
+// -- PAGE: ADMIN ---------------------------------------------------------------
 function PageAdmin({ user, onLogout }) {
   const [embs, setEmbs] = React.useState([]);
   const [ress, setRess] = React.useState([]);
@@ -1173,7 +1174,7 @@ function PageAdmin({ user, onLogout }) {
         )}
 
 
-      {/* ── MODAL EDITAR EMBAIXADOR ── */}
+      {/* -- MODAL EDITAR EMBAIXADOR -- */}
       {editEmb && (
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:T.white,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",padding:40}}>
@@ -1227,7 +1228,7 @@ function PageAdmin({ user, onLogout }) {
   );
 }
 
-// ── CHAT PAGE ────────────────────────────────────────────────────────────────
+// -- CHAT PAGE ----------------------------------------------------------------
 function PageChat({ embs, onUnread }) {
   const [conversas, setConversas] = React.useState([]);
   const [ativa, setAtiva] = React.useState(null);
@@ -1425,7 +1426,7 @@ function PageChat({ embs, onUnread }) {
 }
 
 
-// ── PRÉ-ESTREIA PAGE ──────────────────────────────────────────────────────────
+// -- PRÉ-ESTREIA PAGE ----------------------------------------------------------
 function PagePreEstreia() {
   const [lista, setLista] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -1548,7 +1549,7 @@ function PagePreEstreia() {
 }
 
 
-// ── IMPORTAR PAGE ─────────────────────────────────────────────────────────────
+// -- IMPORTAR PAGE -------------------------------------------------------------
 function PageImportar({ onImported }) {
   const [modo, setModo] = React.useState("csv"); // "csv" | "manual"
   const [csvData, setCsvData] = React.useState([]);
@@ -1649,7 +1650,7 @@ function PageImportar({ onImported }) {
         })}
       </div>
 
-      {/* ── CSV ── */}
+      {/* -- CSV -- */}
       {modo==="csv" && (
         <div>
           <div style={{border:"2px dashed "+T.g200,padding:32,textAlign:"center",marginBottom:24}}>
@@ -1717,7 +1718,7 @@ function PageImportar({ onImported }) {
         </div>
       )}
 
-      {/* ── MANUAL ── */}
+      {/* -- MANUAL -- */}
       {modo==="manual" && (
         <div style={{display:"flex",flexDirection:"column",gap:20}}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
@@ -1762,7 +1763,7 @@ function PageImportar({ onImported }) {
 }
 
 
-// ── WHATSAPP PAGE ────────────────────────────────────────────────────────────
+// -- WHATSAPP PAGE ------------------------------------------------------------
 function PageWhatsApp({ embs }) {
   const [templates, setTemplates] = React.useState([]);
   const [loadingTpl, setLoadingTpl] = React.useState(false);
@@ -1912,7 +1913,7 @@ function PageWhatsApp({ embs }) {
       <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",color:T.g400,textTransform:"uppercase",marginBottom:4}}>WhatsApp Business API</p>
       <h2 style={{fontFamily:T.serif,fontSize:32,fontWeight:300,marginBottom:32}}>Disparos</h2>
 
-      {/* ── DISPARO MANUAL ── */}
+      {/* -- DISPARO MANUAL -- */}
       <div style={{marginBottom:48}}>
         <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",fontWeight:600,marginBottom:20}}>Disparo Manual</p>
 
@@ -1991,7 +1992,7 @@ function PageWhatsApp({ embs }) {
         )}
       </div>
 
-      {/* ── AUTOMAÇÕES ── */}
+      {/* -- AUTOMAÇÕES -- */}
       <div style={{borderTop:"1px solid "+T.g200,paddingTop:32}}>
         <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",fontWeight:600,marginBottom:20}}>Automações</p>
         <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,marginBottom:24,lineHeight:1.6}}>Configure qual template é enviado automaticamente em cada evento. As mensagens são disparadas via Edge Function do Supabase.</p>
@@ -2031,7 +2032,7 @@ function PageWhatsApp({ embs }) {
 }
 
 
-// ── APP ───────────────────────────────────────────────────────────────────────
+// -- APP -----------------------------------------------------------------------
 function App() {
   const [page, setPage] = React.useState(()=>window.location.hash.replace("#","")||"cadastro");
   const [user, setUser] = React.useState(null);
