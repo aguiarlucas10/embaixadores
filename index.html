@@ -10,13 +10,24 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Questrial&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Questrial&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Questrial', sans-serif; background: #fff; color: #000; -webkit-font-smoothing: antialiased; min-height: 100vh; }
     @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
     @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @keyframes heroReveal { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+    .lp-marquee-track { display:flex; width:max-content; animation: marquee 22s linear infinite; }
+    .lp-hero-title { animation: heroReveal 1s ease 0.3s both; }
+    .lp-hero-sub { animation: heroReveal 1s ease 0.6s both; }
+    .lp-hero-btn { animation: heroReveal 1s ease 0.85s both; }
+    .lp-benefit-card:hover { transform: translateY(-4px); transition: transform 0.3s ease; }
+    .lp-faq-item summary { cursor:pointer; list-style:none; }
+    .lp-faq-item summary::-webkit-details-marker { display:none; }
+    .lp-cadastro-input:focus { border-bottom: 2px solid #000 !important; outline: none; }
+    .lp-scroll-snap { scroll-behavior: smooth; }
     .fade-up { animation: fadeUp 0.5s ease forwards; }
     .fade-in { animation: fadeIn 0.35s ease forwards; }
     .stagger > * { opacity:0; animation: fadeUp 0.5s ease forwards; }
@@ -76,6 +87,7 @@ const CONFIG = {
   COMISSAO_PCT:        0.10,
   JANELA_DEVOLUCAO:    7,
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
+
 
 };
 
@@ -314,6 +326,104 @@ function SplitLayout({ left, right }) {
 }
 
 // -- PAGE: CADASTRO ----------------------------------------------------------
+// -- LANDING PAGE COMPONENTS ------------------------------------------------
+
+function LPMarquee() {
+  const text = "SEJA EMBAIXADORA SAINT GERMAIN \u2022 SEJA EMBAIXADORA SAINT GERMAIN \u2022 ";
+  const full = text.repeat(8);
+  return (
+    <div style={{background:"#000",overflow:"hidden",padding:"14px 0",borderTop:"1px solid #222",borderBottom:"1px solid #222"}}>
+      <div className="lp-marquee-track" style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",color:"#fff",whiteSpace:"nowrap"}}>
+        {full}{full}
+      </div>
+    </div>
+  );
+}
+
+function LPBenefits() {
+  const items = [
+    { icon: "\ud83c\udff7\ufe0f", title: "Cupom exclusivo", desc: "Seu codigo personalizado que oferece 10% de desconto para seus seguidores." },
+    { icon: "\ud83d\udcb8", title: "Comissao mensal", desc: "Ganhe 10% de comissao sobre cada venda realizada com seu cupom." },
+    { icon: "\ud83c\udf81", title: "Presentinhos VIP", desc: "Embaixadoras ativas recebem mimos e lancamentos exclusivos da Saint Germain." },
+    { icon: "\u2b50", title: "Visibilidade", desc: "Suas fotos e perfil podem ser repostados nos canais oficiais da marca." },
+    { icon: "\ud83d\udc65", title: "Comunidade", desc: "Acesso ao grupo exclusivo com outras embaixadoras e novidades em primeira mao." },
+    { icon: "\ud83d\udcc8", title: "Crescimento", desc: "Dicas de conteudo e estrategias para voce crescer como influenciadora." },
+  ];
+  return (
+    <section style={{background:"#f9f6f2",padding:"80px 24px"}}>
+      <div style={{maxWidth:1100,margin:"0 auto"}}>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:T.g400,textAlign:"center",marginBottom:8}}>Por que ser embaixadora</p>
+        <h2 style={{fontFamily:T.serif,fontSize:"clamp(32px,5vw,54px)",fontWeight:400,textAlign:"center",lineHeight:1.1,marginBottom:56}}>O que voce <em>ganha?</em></h2>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
+          {items.map((it,i) => (
+            <div key={i} className="lp-benefit-card" style={{background:"#fff",padding:"36px 28px",borderBottom:"3px solid #000",transition:"transform 0.3s ease"}}>
+              <div style={{fontSize:28,marginBottom:16}}>{it.icon}</div>
+              <h3 style={{fontFamily:T.serif,fontSize:22,fontWeight:400,marginBottom:10}}>{it.title}</h3>
+              <p style={{fontFamily:T.sans,fontSize:13,color:T.g500,lineHeight:1.8}}>{it.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LPHowItWorks() {
+  const steps = [
+    { num:"01", title:"Cadastre-se", desc:"Preencha o formulario abaixo com seus dados. O programa e exclusivo para clientes que ja compraram na Saint Germain." },
+    { num:"02", title:"Escolha seu cupom", desc:"Voce cria o seu codigo personalizado. Ex: SGBSEUINSTAGRAM. Simples e unico." },
+    { num:"03", title:"Divulgue", desc:"Compartilhe seu cupom com amigas e seguidoras. Cada compra feita com ele conta para voce." },
+    { num:"04", title:"Receba", desc:"10% de comissao sobre cada pedido pago com seu cupom, depositado diretamente para voce." },
+  ];
+  return (
+    <section style={{background:"#fff",padding:"80px 24px"}}>
+      <div style={{maxWidth:1000,margin:"0 auto"}}>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:T.g400,textAlign:"center",marginBottom:8}}>Simples assim</p>
+        <h2 style={{fontFamily:T.serif,fontSize:"clamp(32px,5vw,54px)",fontWeight:400,textAlign:"center",lineHeight:1.1,marginBottom:56}}>Como <em>funciona?</em></h2>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:0}}>
+          {steps.map((s,i) => (
+            <div key={i} style={{padding:"32px 28px",borderLeft:i>0?"1px solid #eee":"none",borderTop:"1px solid #eee"}}>
+              <div style={{fontFamily:T.serif,fontSize:52,fontWeight:300,color:"#e8e0d8",lineHeight:1,marginBottom:20}}>{s.num}</div>
+              <h3 style={{fontFamily:T.sans,fontSize:13,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:10}}>{s.title}</h3>
+              <p style={{fontFamily:T.sans,fontSize:13,color:T.g500,lineHeight:1.8}}>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LPFAQ() {
+  const items = [
+    { q:"Preciso ser influenciadora?", a:"Nao! O programa e para clientes que ja amam a Saint Germain. Nao importa o numero de seguidores. O que vale e o carinho pela marca." },
+    { q:"Preciso comprar produtos?", a:"Nao e necessario ter comprado recentemente. Verificamos apenas se voce ja e cliente. Se ainda nao e, faca sua primeira compra e depois se cadastre!" },
+    { q:"Como recebo a comissao?", a:"Apos o periodo de 7 dias de possivel devolucao, a comissao e contabilizada. Voce indica seu PIX no painel e realizamos o pagamento mensalmente." },
+    { q:"O desconto do cupom vale para mim tambem?", a:"Sim! Seu cupom tambem da 10% de desconto para qualquer pessoa que usar, inclusive voce mesma em futuras compras." },
+    { q:"Posso ser embaixadora mesmo sem redes sociais?", a:"Sim! Voce pode indicar para amigas, familia ou qualquer pessoa. O cupom funciona para qualquer indicacao." },
+  ];
+  return (
+    <section style={{background:"#f9f6f2",padding:"80px 24px"}}>
+      <div style={{maxWidth:720,margin:"0 auto"}}>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:T.g400,textAlign:"center",marginBottom:8}}>Duvidas frequentes</p>
+        <h2 style={{fontFamily:T.serif,fontSize:"clamp(32px,5vw,54px)",fontWeight:400,textAlign:"center",lineHeight:1.1,marginBottom:48}}>FAQ</h2>
+        <div style={{display:"flex",flexDirection:"column",gap:0}}>
+          {items.map((it,i) => (
+            <details key={i} className="lp-faq-item" style={{borderBottom:"1px solid #e0d8d0"}}>
+              <summary style={{padding:"22px 0",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
+                <span style={{fontFamily:T.sans,fontSize:14,fontWeight:400}}>{it.q}</span>
+                <span style={{fontSize:18,color:T.g400,flexShrink:0,userSelect:"none"}}>+</span>
+              </summary>
+              <p style={{fontFamily:T.sans,fontSize:13,color:T.g500,lineHeight:1.9,paddingBottom:22}}>{it.a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// -- PAGE: CADASTRO (Landing page completa + formulario) ---------------------
 function PageCadastro({ onNavigate }) {
   const [f, setF] = React.useState({nome:"",email:"",cpf:"",whatsapp:"",instagram:"",tiktok:""});
   const [aceite, setAceite] = React.useState(false);
@@ -439,103 +549,235 @@ function PageCadastro({ onNavigate }) {
 
   // -- TELA SUCESSO + CRIAR SENHA -------------------------------------------
   if (etapa === "sucesso") return (
-    <div style={{minHeight:"100vh",background:T.white}}>
-      <Header/>
+    <div style={{minHeight:"100vh",background:"#0a0a0a"}}>
+      <header style={{borderBottom:"1px solid rgba(255,255,255,0.08)",padding:"0 32px",height:56,display:"flex",alignItems:"center",background:"rgba(0,0,0,0.9)"}}>
+        <div style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.28em",textTransform:"uppercase",color:"#fff"}}>Saint Germain</div>
+      </header>
       <div style={{maxWidth:480,margin:"0 auto",padding:"72px 24px"}} className="stagger">
-        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g500,marginBottom:32}}>Bem-vindo ao time</p>
-        <h1 style={{fontFamily:T.serif,fontSize:48,fontWeight:300,lineHeight:1.1,marginBottom:32}}>Você agora é<br/>Embaixador<br/><em>Saint Germain.</em></h1>
-        <div style={{background:T.black,padding:"24px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,marginBottom:40}}>
-          <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400}}>Seu cupom exclusivo</span>
-          <span style={{fontFamily:T.sans,fontSize:30,letterSpacing:"0.25em",color:T.white}}>{cupomFinal}</span>
-          <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:T.g500,marginTop:2}}>{(CONFIG.COMISSAO_PCT*100).toFixed(0)}% desconto · {(CONFIG.COMISSAO_PCT*100).toFixed(0)}% comissão por venda</span>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:32}}>Bem-vindo ao time</p>
+        <h1 style={{fontFamily:T.serif,fontSize:48,fontWeight:300,lineHeight:1.1,marginBottom:32,color:"#fff"}}>Voce agora e<br/>Embaixadora<br/><em>Saint Germain.</em></h1>
+        <div style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",padding:"24px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,marginBottom:40}}>
+          <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)"}}>Seu cupom exclusivo</span>
+          <span style={{fontFamily:T.sans,fontSize:30,letterSpacing:"0.25em",color:"#fff"}}>{cupomFinal}</span>
+          <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:"rgba(255,255,255,0.35)",marginTop:2}}>{(CONFIG.COMISSAO_PCT*100).toFixed(0)}% desconto - {(CONFIG.COMISSAO_PCT*100).toFixed(0)}% comissao por venda</span>
         </div>
-        <div style={{borderTop:`1px solid ${T.g200}`,paddingTop:32,marginBottom:32}}>
-          <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:24}}>Crie sua senha de acesso</p>
+        <div style={{borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:32,marginBottom:32}}>
+          <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:24,color:"rgba(255,255,255,0.4)"}}>Crie sua senha de acesso</p>
           <div style={{display:"flex",flexDirection:"column",gap:24,marginBottom:24}}>
-            <Input label="Senha *" type="password" value={senha} onChange={e=>setSenha(e.target.value)} placeholder="Mínimo 6 caracteres"/>
-            <Input label="Confirmar senha *" type="password" value={senhaConfirm} onChange={e=>setSenhaConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&criarContaEAcessar()}/>
+            {[
+              {label:"Senha *",val:senha,set:setSenha,type:"password",ph:"Minimo 6 caracteres"},
+              {label:"Confirmar senha *",val:senhaConfirm,set:setSenhaConfirm,type:"password",ph:""},
+            ].map(function(fi,i){
+              return (
+                <div key={i} style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <label style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)"}}>{fi.label}</label>
+                  <input className="lp-cadastro-input" type={fi.type} value={fi.val} placeholder={fi.ph}
+                    onChange={function(e){fi.set(e.target.value);}}
+                    onKeyDown={i===1?function(e){if(e.key==="Enter")criarContaEAcessar();}:undefined}
+                    style={{fontFamily:T.sans,fontSize:15,border:"none",borderBottom:"1px solid rgba(255,255,255,0.18)",padding:"10px 0",background:"transparent",color:"#fff",width:"100%",borderRadius:0}}/>
+                </div>
+              );
+            })}
           </div>
-          {err && <div style={{marginBottom:24}}><Alert msg={err}/></div>}
-          <BtnPrimary onClick={criarContaEAcessar} loading={loadingAcesso}>Acessar meu painel</BtnPrimary>
+          {err && <div style={{marginBottom:24,padding:"12px 16px",border:"1px solid rgba(255,60,60,0.3)"}}><p style={{fontFamily:T.sans,fontSize:12,color:"#ff6b6b"}}>{err}</p></div>}
+          <button onClick={criarContaEAcessar} disabled={loadingAcesso}
+            style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"18px 32px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loadingAcesso?0.7:1}}>
+            {loadingAcesso
+              ? <span style={{width:14,height:14,border:"1.5px solid #000",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>
+              : "Acessar meu painel"}
+          </button>
         </div>
-        <p style={{fontFamily:T.sans,fontSize:12,color:T.g400,lineHeight:1.8}}>Em breve você receberá uma mensagem com os detalhes do programa e acesso ao grupo exclusivo.</p>
+        <p style={{fontFamily:T.sans,fontSize:12,color:"rgba(255,255,255,0.28)",lineHeight:1.8}}>Em breve voce recebera uma mensagem com os detalhes do programa e acesso ao grupo exclusivo.</p>
       </div>
     </div>
   );
 
   // -- TELA ESCOLHA DO CUPOM ------------------------------------------------
   if (etapa === "cupom") return (
-    <div style={{minHeight:"100vh",background:T.white}}>
-      <Header/>
+    <div style={{minHeight:"100vh",background:"#0a0a0a"}}>
+      <header style={{borderBottom:"1px solid rgba(255,255,255,0.08)",padding:"0 32px",height:56,display:"flex",alignItems:"center",background:"rgba(0,0,0,0.9)"}}>
+        <div style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.28em",textTransform:"uppercase",color:"#fff"}}>Saint Germain</div>
+      </header>
       <div style={{maxWidth:520,margin:"0 auto",padding:"72px 24px"}} className="stagger">
-        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g500,marginBottom:12}}>Quase lá</p>
-        <h1 style={{fontFamily:T.serif,fontSize:42,fontWeight:300,lineHeight:1.1,marginBottom:12}}>Escolha seu<br/><em>cupom exclusivo.</em></h1>
-        <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,lineHeight:1.8,marginBottom:40}}>Este será o código que seus seguidores usam para ganhar desconto — e você ganha comissão em cada venda.</p>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)",marginBottom:12}}>Quase la</p>
+        <h1 style={{fontFamily:T.serif,fontSize:42,fontWeight:300,lineHeight:1.1,marginBottom:12,color:"#fff"}}>Escolha seu<br/><em>cupom exclusivo.</em></h1>
+        <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.4)",lineHeight:1.8,marginBottom:40}}>Este sera o codigo que seus seguidores usam para ganhar desconto e voce ganha comissao em cada venda.</p>
 
         <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:40}}>
-          {opcoesCupom.map(op => (
-            <button key={op} onClick={()=>setCupomEscolhido(op)}
-              style={{
-                fontFamily:T.sans, fontSize:18, letterSpacing:"0.22em", textTransform:"uppercase",
-                padding:"20px 24px", border:`2px solid ${cupomEscolhido===op?T.black:T.g200}`,
-                background:cupomEscolhido===op?T.black:T.white,
-                color:cupomEscolhido===op?T.white:T.black,
-                cursor:"pointer", textAlign:"left", transition:"all 0.15s",
-                display:"flex", alignItems:"center", justifyContent:"space-between"
-              }}>
-              <span>{op}</span>
-              {cupomEscolhido===op && <span style={{fontSize:10,letterSpacing:"0.15em",opacity:0.7}}>SELECIONADO</span>}
-            </button>
-          ))}
+          {opcoesCupom.map(function(op){
+            return (
+              <button key={op} onClick={function(){setCupomEscolhido(op)}}
+                style={{
+                  fontFamily:T.sans, fontSize:18, letterSpacing:"0.22em", textTransform:"uppercase",
+                  padding:"20px 24px",
+                  border:"2px solid "+(cupomEscolhido===op?"#fff":"rgba(255,255,255,0.12)"),
+                  background:cupomEscolhido===op?"#fff":"transparent",
+                  color:cupomEscolhido===op?"#000":"rgba(255,255,255,0.6)",
+                  cursor:"pointer", textAlign:"left", transition:"all 0.15s",
+                  display:"flex", alignItems:"center", justifyContent:"space-between"
+                }}>
+                <span>{op}</span>
+                {cupomEscolhido===op && <span style={{fontSize:10,letterSpacing:"0.15em",opacity:0.7}}>SELECIONADO</span>}
+              </button>
+            );
+          })}
         </div>
 
-        {err && <div style={{marginBottom:24}}><Alert msg={err}/></div>}
+        {err && <div style={{marginBottom:24,padding:"12px 16px",border:"1px solid rgba(255,60,60,0.3)"}}><p style={{fontFamily:T.sans,fontSize:12,color:"#ff6b6b"}}>{err}</p></div>}
 
-        <BtnPrimary onClick={finalizar} loading={loadingFinalizar}>Confirmar e entrar no programa</BtnPrimary>
-        <button onClick={()=>{setEtapa("form");setErr("");}}
-          style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:"none",cursor:"pointer",color:T.g400,marginTop:16,width:"100%",textAlign:"center"}}>
-          ← Voltar
+        <button onClick={finalizar} disabled={loadingFinalizar}
+          style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"18px 32px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loadingFinalizar?0.7:1}}>
+          {loadingFinalizar
+            ? <span style={{width:14,height:14,border:"1.5px solid #000",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>
+            : "Confirmar e entrar no programa"}
+        </button>
+        <button onClick={function(){setEtapa("form");setErr("");}}
+          style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.3)",marginTop:16,width:"100%",textAlign:"center"}}>
+          Voltar
         </button>
       </div>
     </div>
   );
 
-  // -- TELA FORMULÁRIO ------------------------------------------------------
+  // -- LANDING PAGE COMPLETA + FORMULARIO -----------------------------------
   return (
     <div style={{minHeight:"100vh",background:T.white}}>
-      <Header/>
-      <SplitLayout
-        left={
-          <div className="stagger">
-            <div>
-              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g500,marginBottom:40}}>Clientes Embaixadores</p>
-              <h1 style={{fontFamily:T.serif,fontSize:56,fontWeight:400,color:T.white,lineHeight:1.08,marginBottom:32}}>Faça parte<br/>de algo<br/><em>exclusivo.</em></h1>
-              <p style={{fontFamily:T.sans,fontSize:14,color:T.g400,lineHeight:1.9,maxWidth:300}}>Um convite para clientes que já fazem parte da história da Saint Germain.</p>
-            </div>
-            <p style={{fontFamily:T.serif,fontSize:13,color:T.g600,letterSpacing:"0.1em",fontStyle:"italic"}}>Saint Germain — Est. Brasil</p>
+      {/* HEADER */}
+      <header style={{position:"fixed",top:0,left:0,right:0,zIndex:200,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(8px)",borderBottom:"1px solid rgba(255,255,255,0.08)",padding:"0 32px",height:56,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.28em",textTransform:"uppercase",color:"#fff"}}>Saint Germain</div>
+        <div style={{display:"flex",alignItems:"center",gap:24}}>
+          <button onClick={function(){document.getElementById("sg-form-section").scrollIntoView({behavior:"smooth"});}}
+            style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"8px 20px",cursor:"pointer"}}>
+            Cadastre-se
+          </button>
+          <button onClick={function(){onNavigate("login");}}
+            style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",background:"transparent",color:"rgba(255,255,255,0.55)",border:"none",cursor:"pointer"}}>
+            Entrar
+          </button>
+        </div>
+      </header>
+
+      {/* HERO */}
+      <section style={{position:"relative",minHeight:"100vh",background:"#0a0a0a",display:"flex",alignItems:"flex-end",overflow:"hidden",paddingBottom:80}}>
+        {/* Gradient overlay */}
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.85) 100%)",zIndex:2}}/>
+        {/* BG pattern */}
+        <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle at 25% 35%, rgba(255,245,235,0.04) 0%, transparent 55%), radial-gradient(circle at 75% 65%, rgba(255,245,235,0.03) 0%, transparent 50%)",zIndex:1}}/>
+        {/* Hero content */}
+        <div style={{position:"relative",zIndex:3,maxWidth:1100,margin:"0 auto",padding:"0 32px",width:"100%"}}>
+          <p className="lp-hero-sub" style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.28em",textTransform:"uppercase",color:"rgba(255,255,255,0.5)",marginBottom:20}}>Programa Exclusivo</p>
+          <h1 className="lp-hero-title" style={{fontFamily:T.serif,fontWeight:400,fontSize:"clamp(48px,8vw,100px)",color:"#fff",lineHeight:1.0,marginBottom:28}}>
+            Clientes<br/><em style={{fontStyle:"italic",color:"rgba(255,255,255,0.7)"}}>Embaixadoras</em><br/>Saint Germain.
+          </h1>
+          <p className="lp-hero-sub" style={{fontFamily:T.sans,fontSize:"clamp(13px,1.8vw,16px)",color:"rgba(255,255,255,0.55)",lineHeight:1.9,maxWidth:480,marginBottom:44}}>
+            Transforme seu amor pela marca em recompensas reais. Cupom exclusivo, comissoes mensais e beneficios para quem ja faz parte da historia da Saint Germain.
+          </p>
+          <div className="lp-hero-btn" style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+            <button onClick={function(){document.getElementById("sg-form-section").scrollIntoView({behavior:"smooth"});}}
+              style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"18px 40px",cursor:"pointer"}}>
+              Quero ser embaixadora
+            </button>
+            <button onClick={function(){document.getElementById("sg-como-funciona").scrollIntoView({behavior:"smooth"});}}
+              style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.18em",textTransform:"uppercase",background:"transparent",color:"rgba(255,255,255,0.6)",border:"1px solid rgba(255,255,255,0.25)",padding:"18px 32px",cursor:"pointer"}}>
+              Como funciona
+            </button>
           </div>
-        }
-        right={
-          <div className="stagger">
-            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:48}}>Cadastre-se</p>
-            <div style={{display:"flex",flexDirection:"column",gap:28,marginBottom:40}}>
-              <Input label="Nome completo *" value={f.nome} onChange={e=>set("nome",e.target.value)}/>
-              <Input label="E-mail *" type="email" value={f.email} onChange={e=>set("email",e.target.value)} placeholder="O mesmo utilizado na loja"/>
-              <Input label="CPF *" value={f.cpf} onChange={e=>set("cpf",e.target.value)}/>
-              <Input label="WhatsApp *" value={f.whatsapp} onChange={e=>set("whatsapp",e.target.value)}/>
-              <Input label="Instagram" value={f.instagram} onChange={e=>set("instagram",e.target.value)} placeholder="@"/>
-              <Input label="TikTok" value={f.tiktok} onChange={e=>set("tiktok",e.target.value)} placeholder="@"/>
-            </div>
-            <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:32}}>
-              <input type="checkbox" id="t" checked={aceite} onChange={e=>setAceite(e.target.checked)} style={{width:14,height:14,marginTop:2,cursor:"pointer",flexShrink:0}}/>
-              <label htmlFor="t" style={{fontFamily:T.sans,fontSize:11,color:T.g500,lineHeight:1.7,cursor:"pointer"}}>Aceito os termos do programa e autorizo o uso da minha imagem em publicações relacionadas ao programa Clientes Embaixadores da Saint Germain.</label>
-            </div>
-            {err && <div style={{marginBottom:24}}><Alert msg={err}/></div>}
-            <BtnPrimary onClick={avancarParaCupom} loading={loading}>Continuar</BtnPrimary>
-            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:24,textAlign:"center"}}>Já é embaixador?{" "}<TextLink onClick={()=>onNavigate("login")}>Acesse seu painel</TextLink></p>
+        </div>
+      </section>
+
+      {/* MARQUEE */}
+      <LPMarquee/>
+
+      {/* BENEFITS */}
+      <LPBenefits/>
+
+      {/* MARQUEE 2 */}
+      <LPMarquee/>
+
+      {/* HOW IT WORKS */}
+      <div id="sg-como-funciona">
+        <LPHowItWorks/>
+      </div>
+
+      {/* CALLOUT STRIP */}
+      <section style={{background:"#000",padding:"72px 24px",textAlign:"center"}}>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:12}}>Exclusivo para clientes</p>
+        <h2 style={{fontFamily:T.serif,fontSize:"clamp(28px,4vw,48px)",fontWeight:300,color:"#fff",lineHeight:1.2,marginBottom:28}}>
+          Nao e preciso ter seguidores.<br/><em>So precisa amar a Saint Germain.</em>
+        </h2>
+        <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.45)",lineHeight:1.8,maxWidth:480,margin:"0 auto 36px"}}>
+          O programa e para quem ja comprou na nossa loja. Sem custo, sem burocracia. Voce indica, a gente acompanha e voce recebe.
+        </p>
+        <button onClick={function(){document.getElementById("sg-form-section").scrollIntoView({behavior:"smooth"});}}
+          style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"16px 40px",cursor:"pointer"}}>
+          Cadastre-se agora
+        </button>
+      </section>
+
+      {/* FAQ */}
+      <LPFAQ/>
+
+      {/* FORM SECTION */}
+      <section id="sg-form-section" style={{background:"#0a0a0a",padding:"80px 24px 100px"}}>
+        <div style={{maxWidth:560,margin:"0 auto"}}>
+          <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)",marginBottom:8,textAlign:"center"}}>Programa Embaixadoras</p>
+          <h2 style={{fontFamily:T.serif,fontSize:"clamp(32px,5vw,52px)",fontWeight:400,color:"#fff",lineHeight:1.1,textAlign:"center",marginBottom:12}}>
+            Pronta para<br/><em>entrar no time?</em>
+          </h2>
+          <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.4)",textAlign:"center",lineHeight:1.8,marginBottom:48}}>
+            Preencha os dados abaixo. Verificamos automaticamente se voce e cliente da Saint Germain.
+          </p>
+
+          {/* FORM */}
+          <div style={{display:"flex",flexDirection:"column",gap:28,marginBottom:36}}>
+            {[
+              {label:"Nome completo *",key:"nome",type:"text",ph:""},
+              {label:"E-mail *",key:"email",type:"email",ph:"O mesmo utilizado na loja"},
+              {label:"CPF *",key:"cpf",type:"text",ph:""},
+              {label:"WhatsApp *",key:"whatsapp",type:"text",ph:"(11) 99999-9999"},
+              {label:"Instagram",key:"instagram",type:"text",ph:"@"},
+              {label:"TikTok",key:"tiktok",type:"text",ph:"@"},
+            ].map(function(field){
+              return (
+                <div key={field.key} style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <label style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)"}}>{field.label}</label>
+                  <input className="lp-cadastro-input" type={field.type} value={f[field.key]} onChange={function(e){set(field.key,e.target.value);}} placeholder={field.ph}
+                    style={{fontFamily:T.sans,fontSize:15,border:"none",borderBottom:"1px solid rgba(255,255,255,0.18)",padding:"10px 0",background:"transparent",color:"#fff",width:"100%",borderRadius:0,transition:"border-bottom 0.15s"}}/>
+                </div>
+              );
+            })}
           </div>
-        }
-      />
+
+          <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:36}}>
+            <input type="checkbox" id="aceite-lp" checked={aceite} onChange={function(e){setAceite(e.target.checked);}}
+              style={{width:14,height:14,marginTop:2,cursor:"pointer",flexShrink:0,accentColor:"#fff"}}/>
+            <label htmlFor="aceite-lp" style={{fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.4)",lineHeight:1.7,cursor:"pointer"}}>
+              Aceito os termos do programa e autorizo o uso da minha imagem em publicacoes relacionadas ao programa Clientes Embaixadores da Saint Germain.
+            </label>
+          </div>
+
+          {err && <div style={{marginBottom:24,padding:"12px 16px",border:"1px solid rgba(255,60,60,0.3)",background:"rgba(255,40,40,0.08)"}}><p style={{fontFamily:T.sans,fontSize:12,color:"#ff6b6b"}}>{err}</p></div>}
+
+          <button onClick={avancarParaCupom} disabled={loading}
+            style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"18px 32px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1}}>
+            {loading
+              ? <span style={{width:14,height:14,border:"1.5px solid #000",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>
+              : "Continuar"}
+          </button>
+
+          <p style={{fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.28)",marginTop:20,textAlign:"center"}}>
+            Ja e embaixadora?{" "}
+            <button onClick={function(){onNavigate("login");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.55)",textDecoration:"underline"}}>
+              Acesse seu painel
+            </button>
+          </p>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{background:"#000",borderTop:"1px solid rgba(255,255,255,0.06)",padding:"32px 24px",textAlign:"center"}}>
+        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.22em",textTransform:"uppercase",color:"rgba(255,255,255,0.2)"}}>Saint Germain - Programa Clientes Embaixadoras</p>
+      </footer>
     </div>
   );
 }
