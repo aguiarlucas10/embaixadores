@@ -1434,7 +1434,54 @@ function PagePreEstreia() {
   const [salvando, setSalvando] = React.useState(false);
   const [msg, setMsg] = React.useState({text:"",ok:false});
   const [busca, setBusca] = React.useState("");
+  const [csvMode, setCsvMode] = React.useState(false);
+  const [csvPreview, setCsvPreview] = React.useState([]);
+  const [csvErros, setCsvErros] = React.useState([]);
+  const [importando, setImportando] = React.useState(false);
+  const [resImport, setResImport] = React.useState(null);
   const setF = function(k,v){ setForm(function(p){ return {...p,[k]:v}; }); };
+
+  function parseCsvEstreia(text) {
+    setCsvPreview([]); setCsvErros([]); setResImport(null);
+    const lines = text.trim().split(String.fromCharCode(10));
+    if(lines.length < 2) { setCsvErros(["Arquivo vazio ou sem dados"]); return; }
+    const headers = lines[0].split(",").map(function(h){ return h.trim().replace(/"/g,"").toLowerCase(); });
+    if(!headers.includes("nome") || !headers.includes("telefone")) {
+      setCsvErros(["Colunas obrigatorias ausentes: nome e/ou telefone"]); return;
+    }
+    const rows = []; const erros = [];
+    for(let i=1; i<lines.length; i++) {
+      const vals = lines[i].split(",").map(function(v){ return v.trim().replace(/^"|"$/g,""); });
+      const row = {};
+      headers.forEach(function(h,idx){ row[h] = vals[idx]||""; });
+      if(!row.nome || !row.telefone) { erros.push("Linha "+(i+1)+": nome ou telefone vazio"); }
+      else { rows.push(row); }
+    }
+    setCsvPreview(rows); setCsvErros(erros);
+  }
+
+  function handleCsvFile(e) {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev){ parseCsvEstreia(ev.target.result); };
+    reader.readAsText(file, "UTF-8");
+  }
+
+  async function importarCsv() {
+    if(!csvPreview.length) return;
+    setImportando(true); setResImport(null);
+    let ok=0; const erros=[];
+    for(const row of csvPreview) {
+      const {error} = await supabase.from("pre_estreia").insert({
+        nome: row.nome,
+        telefone: row.telefone.replace(/[^0-9]/g,"")
+      });
+      if(error) { erros.push(row.nome+": "+error.message); } else { ok++; }
+    }
+    setResImport({ok, erros});
+    if(ok>0) load();
+    setImportando(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -1493,19 +1540,88 @@ function PagePreEstreia() {
         })}
       </div>
 
-      {/* Formulário */}
-      <div style={{border:"1px solid "+T.g200,padding:24,marginBottom:32}}>
-        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:16}}>Adicionar contato</p>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:12,alignItems:"end"}}>
-          <Input label="Nome" value={form.nome} onChange={function(e){setF("nome",e.target.value);}}/>
-          <Input label="Telefone (WhatsApp)" value={form.telefone} onChange={function(e){setF("telefone",e.target.value);}} placeholder="11999998888"/>
-          <button onClick={salvar} disabled={salvando}
-            style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",background:salvando?T.g200:T.black,color:T.white,border:"none",cursor:"pointer",height:40,whiteSpace:"nowrap"}}>
-            {salvando?"Salvando...":"+ Adicionar"}
-          </button>
-        </div>
-        {msg.text && <Alert msg={msg.text} ok={msg.ok}/>}
+      {/* Toggle manual / csv */}
+      <div style={{display:"flex",gap:0,marginBottom:24,borderBottom:"1px solid "+T.g200}}>
+        {[["manual","Adicionar manual"],["csv","Importar CSV"]].map(function(arr){
+          const v=arr[0],l=arr[1];
+          return (
+            <button key={v} onClick={function(){setCsvMode(v==="csv");setCsvPreview([]);setCsvErros([]);setResImport(null);setMsg({text:"",ok:false});}}
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"12px 24px",background:"transparent",border:"none",borderBottom:"2px solid "+(!csvMode&&v==="manual"||csvMode&&v==="csv"?T.black:"transparent"),color:(!csvMode&&v==="manual"||csvMode&&v==="csv"?T.black:T.g400),cursor:"pointer"}}>
+              {l}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Formulário manual */}
+      {!csvMode && (
+        <div style={{border:"1px solid "+T.g200,padding:24,marginBottom:32}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:12,alignItems:"end"}}>
+            <Input label="Nome" value={form.nome} onChange={function(e){setF("nome",e.target.value);}}/>
+            <Input label="Telefone (WhatsApp)" value={form.telefone} onChange={function(e){setF("telefone",e.target.value);}} placeholder="11999998888"/>
+            <button onClick={salvar} disabled={salvando}
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",background:salvando?T.g200:T.black,color:T.white,border:"none",cursor:"pointer",height:40,whiteSpace:"nowrap"}}>
+              {salvando?"Salvando...":"+ Adicionar"}
+            </button>
+          </div>
+          {msg.text && <Alert msg={msg.text} ok={msg.ok}/>}
+        </div>
+      )}
+
+      {/* Importar CSV */}
+      {csvMode && (
+        <div style={{border:"1px solid "+T.g200,padding:24,marginBottom:32}}>
+          <div style={{marginBottom:16,padding:"12px 16px",background:"#f9f9f9",border:"1px solid "+T.g200}}>
+            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:4}}>Colunas obrigatorias:</p>
+            <p style={{fontFamily:T.sans,fontSize:12,fontWeight:600,letterSpacing:"0.05em"}}>nome, telefone</p>
+            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:4}}>Coluna opcional: nenhuma — apenas nome e telefone sao necessarios</p>
+          </div>
+          <input type="file" accept=".csv" onChange={handleCsvFile} style={{fontFamily:T.sans,fontSize:12,cursor:"pointer",marginBottom:16}}/>
+          {csvErros.length>0 && (
+            <div style={{background:"#fff0f0",border:"1px solid #fcc",padding:12,marginBottom:12}}>
+              {csvErros.map(function(e,i){ return <p key={i} style={{fontFamily:T.sans,fontSize:12,color:"#c00"}}>{e}</p>; })}
+            </div>
+          )}
+          {csvPreview.length>0 && (
+            <div style={{marginBottom:16}}>
+              <p style={{fontFamily:T.sans,fontSize:12,color:T.g400,marginBottom:8}}>{csvPreview.length} contato{csvPreview.length!==1?"s":""} encontrados</p>
+              <div style={{border:"1px solid "+T.g200,maxHeight:180,overflowY:"auto",marginBottom:12}}>
+                {csvPreview.slice(0,5).map(function(r,i){
+                  return (
+                    <div key={i} style={{display:"flex",gap:24,padding:"8px 12px",borderBottom:"1px solid "+T.g200,fontFamily:T.sans,fontSize:12}}>
+                      <span style={{flex:2}}>{r.nome}</span>
+                      <span style={{flex:2,color:T.g400}}>{r.telefone}</span>
+                    </div>
+                  );
+                })}
+                {csvPreview.length>5 && <p style={{padding:"6px 12px",fontFamily:T.sans,fontSize:11,color:T.g400}}>+{csvPreview.length-5} mais...</p>}
+              </div>
+              <button onClick={importarCsv} disabled={importando}
+                style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"12px 28px",background:importando?T.g200:T.black,color:T.white,border:"none",cursor:importando?"not-allowed":"pointer"}}>
+                {importando?"Importando...":"Importar "+csvPreview.length+" contatos"}
+              </button>
+            </div>
+          )}
+          {resImport && (
+            <div style={{padding:16,border:"1px solid "+T.g200,marginTop:8}}>
+              <p style={{fontFamily:T.sans,fontSize:13,fontWeight:600,color:resImport.ok>0?"#2a7a2a":"#c00",marginBottom:4}}>
+                {resImport.ok} importado{resImport.ok!==1?"s":""} com sucesso
+              </p>
+              {resImport.erros.map(function(e,i){ return <p key={i} style={{fontFamily:T.sans,fontSize:11,color:"#c00"}}>{e}</p>; })}
+            </div>
+          )}
+          <div style={{marginTop:20,paddingTop:16,borderTop:"1px solid "+T.g200}}>
+            <button onClick={function(){
+              const blob = new Blob(["nome,telefone"+String.fromCharCode(10)+"Maria Silva,11999998888"], {type:"text/csv;charset=utf-8;"});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a"); a.href=url; a.download="modelo_pre_estreia.csv"; a.click();
+              URL.revokeObjectURL(url);
+            }} style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",border:"1px solid "+T.g200,background:"transparent",cursor:"pointer"}}>
+              Baixar modelo CSV
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Busca */}
       <div style={{marginBottom:16}}>
