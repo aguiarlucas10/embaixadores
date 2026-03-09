@@ -238,34 +238,57 @@ function StatGrid({ items, cols=2 }) {
   );
 }
 
-function Tabs({ tabs, labels, active, onChange }) {
+function Tabs({ tabs, labels, active, onChange, children }) {
   const [open, setOpen] = React.useState(false);
   const activeLabel = labels[active] || active;
+  const SIDEBAR_W = 220;
 
   return (
-    <div style={{position:"relative",marginBottom:32}}>
-      {/* Trigger bar */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+T.black,paddingBottom:12,cursor:"pointer"}} onClick={function(){ setOpen(function(v){ return !v; }); }}>
-        <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.black}}>{activeLabel}</span>
-        <span style={{fontFamily:T.sans,fontSize:16,color:T.black,lineHeight:1,transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s",display:"inline-block"}}>&#8964;</span>
-      </div>
+    <div style={{display:"flex",minHeight:"60vh",position:"relative"}}>
 
-      {/* Dropdown menu */}
-      {open && (
-        <div style={{position:"absolute",top:"100%",left:0,zIndex:100,background:T.white,border:"1px solid "+T.black,minWidth:220,boxShadow:"4px 4px 0 rgba(0,0,0,0.08)"}}>
-          {tabs.map(function(t){
-            return (
-              <button key={t} onClick={function(){ onChange(t); setOpen(false); }}
-                style={{display:"block",width:"100%",textAlign:"left",fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",padding:"14px 20px",background:active===t?"#f5f5f5":"transparent",border:"none",borderLeft:"3px solid "+(active===t?T.black:"transparent"),color:active===t?T.black:T.g400,cursor:"pointer"}}>
-                {labels[t]}
-              </button>
-            );
-          })}
+      {/* Sidebar collapsed icon */}
+      {!open && (
+        <div style={{width:40,flexShrink:0,borderRight:"1px solid "+T.g200,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:4}}>
+          <button onClick={function(){ setOpen(true); }}
+            title="Abrir menu"
+            style={{background:"transparent",border:"none",cursor:"pointer",padding:"10px 0",display:"flex",flexDirection:"column",gap:4,alignItems:"center"}}>
+            <span style={{display:"block",width:16,height:1.5,background:T.black}}/>
+            <span style={{display:"block",width:16,height:1.5,background:T.black}}/>
+            <span style={{display:"block",width:16,height:1.5,background:T.black}}/>
+          </button>
+          {/* Rotated active label */}
+          <p style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",color:T.g400,writingMode:"vertical-rl",transform:"rotate(180deg)",marginTop:12,whiteSpace:"nowrap"}}>{activeLabel}</p>
         </div>
       )}
 
-      {/* Backdrop to close */}
-      {open && <div style={{position:"fixed",inset:0,zIndex:99}} onClick={function(){ setOpen(false); }}/>}
+      {/* Sidebar expanded */}
+      {open && (
+        <>
+          <div style={{width:SIDEBAR_W,flexShrink:0,borderRight:"1px solid "+T.g200,paddingTop:4}}>
+            {/* Close button */}
+            <button onClick={function(){ setOpen(false); }}
+              style={{background:"transparent",border:"none",cursor:"pointer",padding:"10px 16px",display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+              <span style={{fontFamily:T.sans,fontSize:18,lineHeight:1,color:T.black}}>&#8592;</span>
+              <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",color:T.g400}}>Fechar</span>
+            </button>
+            {tabs.map(function(t){
+              return (
+                <button key={t} onClick={function(){ onChange(t); setOpen(false); }}
+                  style={{display:"block",width:"100%",textAlign:"left",fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",padding:"13px 20px",background:"transparent",border:"none",borderLeft:"2px solid "+(active===t?T.black:"transparent"),color:active===t?T.black:T.g400,cursor:"pointer",transition:"color 0.15s"}}>
+                  {labels[t]}
+                </button>
+              );
+            })}
+          </div>
+          {/* Backdrop */}
+          <div style={{position:"fixed",inset:0,zIndex:98,background:"rgba(0,0,0,0.08)"}} onClick={function(){ setOpen(false); }}/>
+        </>
+      )}
+
+      {/* Content */}
+      <div style={{flex:1,paddingLeft:open?32:24,paddingRight:0,minWidth:0}}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -727,7 +750,7 @@ function PagePainel({ user, onLogout }) {
         <StatGrid items={[[brl(saldoDisp),"Disponível para resgate"],[brl(saldoPend),"Pendente"],[brl(cs.reduce((s,c)=>s+c.valor_pedido,0)),"Total em vendas"],[brl(cs.filter(c=>c.payment_status==="paid"||c.status==="confirmada").reduce((s,c)=>s+c.valor_comissao,0)),"Comissão acumulada"]]} cols={4}/>
 
         {/* Tabs */}
-        <Tabs tabs={["inicio","vendas","resgatar","perfil"]} labels={{inicio:"Início",vendas:`Vendas (${cs.length})`,resgatar:"Resgatar",perfil:"⚙ Perfil"}} active={tab} onChange={setTab}/>
+        <Tabs tabs={["inicio","vendas","resgatar","perfil"]} labels={{inicio:"Início",vendas:`Vendas (${cs.length})`,resgatar:"Resgatar",perfil:"⚙ Perfil"}} active={tab} onChange={setTab}>
 
         {/* TAB INÍCIO */}
         {tab==="inicio" && (
@@ -873,6 +896,7 @@ function PagePainel({ user, onLogout }) {
           </div>
         )}
 
+      </Tabs>
       </div>
     </div>
   );
@@ -1021,7 +1045,7 @@ function PageAdmin({ user, onLogout }) {
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
 
-        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp","chat","importar","estreia"]} labels={{embaixadores:"Embaixadores ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar",estreia:"Pre-estreia"}} active={tab} onChange={setTab}/>
+        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp","chat","importar","estreia"]} labels={{embaixadores:"Embaixadores ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar",estreia:"Pre-estreia"}} active={tab} onChange={setTab}>
 
         {/* TAB EMBAIXADORES */}
         {tab==="embaixadores"&&(
@@ -1191,6 +1215,7 @@ function PageAdmin({ user, onLogout }) {
         {tab==="whatsapp" && (
           <PageWhatsApp embs={embs} />
         )}
+      </Tabs>
 
 
       {/* -- MODAL EDITAR EMBAIXADOR -- */}
