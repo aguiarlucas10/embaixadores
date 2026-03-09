@@ -878,12 +878,26 @@ function PageLogin({ onLogin, onNavigate }) {
   const [senha, setSenha] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState("");
+  const [modo, setModo] = React.useState("login"); // "login" | "recuperar"
+  const [enviado, setEnviado] = React.useState(false);
+  const [loadingRec, setLoadingRec] = React.useState(false);
 
   async function submit() {
     setErr(""); setLoading(true);
     const {data,error:e} = await supabase.auth.signInWithPassword({email,password:senha});
     if (e) { setErr("E-mail ou senha incorretos."); setLoading(false); return; }
     onLogin(data.user); setLoading(false);
+  }
+
+  async function enviarRecuperacao() {
+    if (!email) { setErr("Digite seu e-mail para continuar."); return; }
+    setErr(""); setLoadingRec(true);
+    const {error:e} = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+    setLoadingRec(false);
+    if (e) { setErr("Não foi possível enviar o e-mail. Verifique o endereço."); return; }
+    setEnviado(true);
   }
 
   return (
@@ -893,19 +907,55 @@ function PageLogin({ onLogin, onNavigate }) {
         left={
           <div className="stagger" style={{display:"flex",flexDirection:"column",justifyContent:"center",height:"100%"}}>
             <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g500,marginBottom:40}}>Painel do Embaixador</p>
-            <h1 style={{fontFamily:T.serif,fontSize:52,fontWeight:300,color:T.white,lineHeight:1.08}}>Bem-vindo<br/><em>de volta.</em></h1>
+            <h1 style={{fontFamily:T.serif,fontSize:52,fontWeight:300,color:T.white,lineHeight:1.08}}>
+              {modo === "login" ? <span>Bem-vindo<br/><em>de volta.</em></span> : <span>Recuperar<br/><em>acesso.</em></span>}
+            </h1>
           </div>
         }
         right={
           <div className="stagger" style={{display:"flex",flexDirection:"column",justifyContent:"center",height:"100%"}}>
-            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:48}}>Entrar</p>
-            <div style={{display:"flex",flexDirection:"column",gap:28,marginBottom:40}}>
-              <Input label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
-              <Input label="Senha" type="password" value={senha} onChange={e=>setSenha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()}/>
-            </div>
-            {err && <div style={{marginBottom:24}}><Alert msg={err}/></div>}
-            <BtnPrimary onClick={submit} loading={loading}>Entrar</BtnPrimary>
-            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:24,textAlign:"center"}}>Ainda não é embaixador?{" "}<TextLink onClick={()=>onNavigate("cadastro")}>Cadastre-se</TextLink></p>
+            {modo === "login" ? (
+              <>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:48}}>Entrar</p>
+                <div style={{display:"flex",flexDirection:"column",gap:28,marginBottom:40}}>
+                  <Input label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+                  <Input label="Senha" type="password" value={senha} onChange={e=>setSenha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()}/>
+                </div>
+                {err && <div style={{marginBottom:24}}><Alert msg={err}/></div>}
+                <BtnPrimary onClick={submit} loading={loading}>Entrar</BtnPrimary>
+                <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:20,textAlign:"center"}}>
+                  <TextLink onClick={()=>{ setErr(""); setModo("recuperar"); }}>Esqueci minha senha</TextLink>
+                </p>
+                <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:12,textAlign:"center"}}>Ainda não é embaixador?{" "}<TextLink onClick={()=>onNavigate("cadastro")}>Cadastre-se</TextLink></p>
+              </>
+            ) : enviado ? (
+              <>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:48}}>Recuperação de senha</p>
+                <div style={{padding:"24px",background:"#f9f6f2",marginBottom:32}}>
+                  <p style={{fontFamily:T.sans,fontSize:13,color:T.g600,lineHeight:1.8}}>
+                    Enviamos um link de redefinição para <strong>{email}</strong>. Verifique sua caixa de entrada (e a pasta de spam).
+                  </p>
+                </div>
+                <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,textAlign:"center"}}>
+                  <TextLink onClick={()=>{ setModo("login"); setEnviado(false); }}>← Voltar ao login</TextLink>
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:48}}>Recuperação de senha</p>
+                <p style={{fontFamily:T.sans,fontSize:13,color:T.g500,lineHeight:1.8,marginBottom:32}}>
+                  Digite seu e-mail e enviaremos um link para você redefinir sua senha.
+                </p>
+                <div style={{marginBottom:32}}>
+                  <Input label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&enviarRecuperacao()}/>
+                </div>
+                {err && <div style={{marginBottom:24}}><Alert msg={err}/></div>}
+                <BtnPrimary onClick={enviarRecuperacao} loading={loadingRec}>Enviar link de recuperação</BtnPrimary>
+                <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:20,textAlign:"center"}}>
+                  <TextLink onClick={()=>{ setErr(""); setModo("login"); }}>← Voltar ao login</TextLink>
+                </p>
+              </>
+            )}
           </div>
         }
       />
