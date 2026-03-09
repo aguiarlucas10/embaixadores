@@ -658,27 +658,27 @@ function PageCadastro({ onNavigate }) {
       </header>
 
       {/* HERO */}
-      <section style={{position:"relative",background:"#0a0a0a",display:"flex",alignItems:"center",overflow:"hidden",paddingTop:120,paddingBottom:80}}>
+      <section style={{position:"relative",background:"#0a0a0a",display:"flex",alignItems:"center",overflow:"hidden",paddingTop:100,paddingBottom:60}}>
         {/* Gradient overlay */}
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.85) 100%)",zIndex:2}}/>
         {/* BG pattern */}
         <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle at 25% 35%, rgba(255,245,235,0.04) 0%, transparent 55%), radial-gradient(circle at 75% 65%, rgba(255,245,235,0.03) 0%, transparent 50%)",zIndex:1}}/>
         {/* Hero content */}
         <div style={{position:"relative",zIndex:3,maxWidth:1100,margin:"0 auto",padding:"0 32px",width:"100%"}}>
-          <p className="lp-hero-sub" style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.28em",textTransform:"uppercase",color:"rgba(255,255,255,0.5)",marginBottom:20}}>Programa Exclusivo</p>
-          <h1 className="lp-hero-title" style={{fontFamily:T.serif,fontWeight:400,fontSize:"clamp(48px,8vw,100px)",color:"#fff",lineHeight:1.0,marginBottom:28}}>
+          <p className="lp-hero-sub" style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.28em",textTransform:"uppercase",color:"rgba(255,255,255,0.5)",marginBottom:14}}>Programa Exclusivo</p>
+          <h1 className="lp-hero-title" style={{fontFamily:T.serif,fontWeight:400,fontSize:"clamp(34px,5.5vw,68px)",color:"#fff",lineHeight:1.05,marginBottom:20}}>
             Clientes<br/><em style={{fontStyle:"italic",color:"rgba(255,255,255,0.7)"}}>Embaixadoras</em><br/>Saint Germain.
           </h1>
-          <p className="lp-hero-sub" style={{fontFamily:T.sans,fontSize:"clamp(13px,1.8vw,16px)",color:"rgba(255,255,255,0.55)",lineHeight:1.9,maxWidth:480,marginBottom:44}}>
+          <p className="lp-hero-sub" style={{fontFamily:T.sans,fontSize:"clamp(12px,1.4vw,14px)",color:"rgba(255,255,255,0.5)",lineHeight:1.8,maxWidth:420,marginBottom:32}}>
             Transforme seu amor pela marca em recompensas reais. Cupom exclusivo, comissoes mensais e beneficios para quem ja faz parte da historia da Saint Germain.
           </p>
-          <div className="lp-hero-btn" style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+          <div className="lp-hero-btn" style={{display:"flex",gap:12,flexWrap:"wrap"}}>
             <button onClick={function(){document.getElementById("sg-form-section").scrollIntoView({behavior:"smooth"});}}
-              style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"18px 40px",cursor:"pointer"}}>
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"14px 32px",cursor:"pointer"}}>
               Quero ser embaixadora
             </button>
             <button onClick={function(){document.getElementById("sg-como-funciona").scrollIntoView({behavior:"smooth"});}}
-              style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.18em",textTransform:"uppercase",background:"transparent",color:"rgba(255,255,255,0.6)",border:"1px solid rgba(255,255,255,0.25)",padding:"18px 32px",cursor:"pointer"}}>
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.18em",textTransform:"uppercase",background:"transparent",color:"rgba(255,255,255,0.6)",border:"1px solid rgba(255,255,255,0.25)",padding:"14px 24px",cursor:"pointer"}}>
               Como funciona
             </button>
           </div>
@@ -688,18 +688,26 @@ function PageCadastro({ onNavigate }) {
       {/* MARQUEE */}
       <LPMarquee/>
 
-      {/* BENEFITS */}
-      <LPBenefits/>
-
-      {/* VIDEO + NEW COPY */}
-      <section style={{background:"#fff",padding:"80px 24px"}}>
+      {/* VIDEO + COPY */}
+      <section style={{background:"#fff",padding:"64px 24px"}}>
         <div style={{maxWidth:800,margin:"0 auto"}}>
-          {/* New copy text */}
-          <div style={{maxWidth:580,margin:"0 auto 56px",textAlign:"center"}}>
-            <h2 style={{fontFamily:T.serif,fontSize:"clamp(28px,4vw,44px)",fontWeight:400,lineHeight:1.2,marginBottom:28}}>
+          {/* YouTube embed - autoplay muted */}
+          <div style={{position:"relative",paddingBottom:"56.25%",height:0,overflow:"hidden",borderRadius:2,boxShadow:"0 24px 64px rgba(0,0,0,0.12)",marginBottom:48}}>
+            <iframe
+              src="https://www.youtube.com/embed/yqjW3oJNB0c?start=50&autoplay=1&mute=1&loop=1&playlist=yqjW3oJNB0c"
+              title="Saint Germain Embaixadoras"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{position:"absolute",top:0,left:0,width:"100%",height:"100%"}}
+            />
+          </div>
+          {/* Copy text */}
+          <div style={{maxWidth:560,margin:"0 auto"}}>
+            <h2 style={{fontFamily:T.serif,fontSize:"clamp(26px,3.5vw,40px)",fontWeight:400,lineHeight:1.2,marginBottom:24,textAlign:"center"}}>
               O que muda quando<br/><em>voce entra.</em>
             </h2>
-            <div style={{display:"flex",flexDirection:"column",gap:16,textAlign:"left"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
               {[
                 "Voce passa a conhecer os lancamentos antes de todo mundo.",
                 "Voce entra em um grupo seleto de pessoas que, assim como voce, escolheram a SG.",
@@ -709,25 +717,17 @@ function PageCadastro({ onNavigate }) {
                 return (
                   <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12}}>
                     <span style={{fontFamily:T.serif,fontSize:18,color:"#c8b89a",flexShrink:0,lineHeight:1.6}}>-</span>
-                    <p style={{fontFamily:T.sans,fontSize:15,color:T.g600,lineHeight:1.8}}>{line}</p>
+                    <p style={{fontFamily:T.sans,fontSize:14,color:T.g600,lineHeight:1.8}}>{line}</p>
                   </div>
                 );
               })}
             </div>
           </div>
-          {/* YouTube embed */}
-          <div style={{position:"relative",paddingBottom:"56.25%",height:0,overflow:"hidden",borderRadius:2,boxShadow:"0 24px 64px rgba(0,0,0,0.12)"}}>
-            <iframe
-              src="https://www.youtube.com/embed/yqjW3oJNB0c?start=50"
-              title="Saint Germain Embaixadoras"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{position:"absolute",top:0,left:0,width:"100%",height:"100%"}}
-            />
-          </div>
         </div>
       </section>
+
+      {/* BENEFITS */}
+      <LPBenefits/>
 
       {/* MARQUEE 2 */}
       <LPMarquee/>
