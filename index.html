@@ -373,7 +373,7 @@ function LPHowItWorks() {
     { num:"01", title:"Cadastre-se", desc:"Preencha o formulario abaixo com seus dados. O programa e exclusivo para clientes que ja compraram na Saint Germain." },
     { num:"02", title:"Escolha seu cupom", desc:"Voce cria o seu codigo personalizado. Ex: SGBSEUINSTAGRAM. Simples e unico." },
     { num:"03", title:"Divulgue", desc:"Compartilhe seu cupom com amigas e seguidoras. Cada compra feita com ele conta para voce." },
-    { num:"04", title:"Receba", desc:"10% de comissao sobre cada pedido pago com seu cupom, depositado diretamente para voce." },
+    { num:"04", title:"Receba", desc:"10% de comissao sobre cada pedido pago com seu cupom, depositado diretamente para voce. O pagamento dos resgates e realizado todo dia 20, consulte a politica no contrato." },
   ];
   return (
     <section style={{background:"#fff",padding:"80px 24px"}}>
@@ -658,7 +658,7 @@ function PageCadastro({ onNavigate }) {
       </header>
 
       {/* HERO */}
-      <section style={{position:"relative",minHeight:"100vh",background:"#0a0a0a",display:"flex",alignItems:"flex-end",overflow:"hidden",paddingBottom:80}}>
+      <section style={{position:"relative",background:"#0a0a0a",display:"flex",alignItems:"center",overflow:"hidden",paddingTop:120,paddingBottom:80}}>
         {/* Gradient overlay */}
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.85) 100%)",zIndex:2}}/>
         {/* BG pattern */}
@@ -690,6 +690,44 @@ function PageCadastro({ onNavigate }) {
 
       {/* BENEFITS */}
       <LPBenefits/>
+
+      {/* VIDEO + NEW COPY */}
+      <section style={{background:"#fff",padding:"80px 24px"}}>
+        <div style={{maxWidth:800,margin:"0 auto"}}>
+          {/* New copy text */}
+          <div style={{maxWidth:580,margin:"0 auto 56px",textAlign:"center"}}>
+            <h2 style={{fontFamily:T.serif,fontSize:"clamp(28px,4vw,44px)",fontWeight:400,lineHeight:1.2,marginBottom:28}}>
+              O que muda quando<br/><em>voce entra.</em>
+            </h2>
+            <div style={{display:"flex",flexDirection:"column",gap:16,textAlign:"left"}}>
+              {[
+                "Voce passa a conhecer os lancamentos antes de todo mundo.",
+                "Voce entra em um grupo seleto de pessoas que, assim como voce, escolheram a SG.",
+                "Voce e vista. Repostada. Reconhecida.",
+                "E cada vez que alguem compra pelo seu cupom, voce recebe tambem.",
+              ].map(function(line,i){
+                return (
+                  <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12}}>
+                    <span style={{fontFamily:T.serif,fontSize:18,color:"#c8b89a",flexShrink:0,lineHeight:1.6}}>-</span>
+                    <p style={{fontFamily:T.sans,fontSize:15,color:T.g600,lineHeight:1.8}}>{line}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* YouTube embed */}
+          <div style={{position:"relative",paddingBottom:"56.25%",height:0,overflow:"hidden",borderRadius:2,boxShadow:"0 24px 64px rgba(0,0,0,0.12)"}}>
+            <iframe
+              src="https://www.youtube.com/embed/yqjW3oJNB0c?start=50"
+              title="Saint Germain Embaixadoras"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{position:"absolute",top:0,left:0,width:"100%",height:"100%"}}
+            />
+          </div>
+        </div>
+      </section>
 
       {/* MARQUEE 2 */}
       <LPMarquee/>
@@ -771,6 +809,53 @@ function PageCadastro({ onNavigate }) {
               Acesse seu painel
             </button>
           </p>
+        </div>
+      </section>
+
+      {/* REGRAS E TERMOS */}
+      <section style={{background:"#0d0d0d",borderTop:"1px solid rgba(255,255,255,0.06)",padding:"48px 24px 40px"}}>
+        <div style={{maxWidth:720,margin:"0 auto"}}>
+          {/* Titulo colapsavel */}
+          <details style={{marginBottom:0}}>
+            <summary style={{listStyle:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,userSelect:"none"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.22em",textTransform:"uppercase",color:"rgba(255,255,255,0.25)",display:"inline-block",border:"1px solid rgba(255,255,255,0.1)",padding:"3px 8px"}}>Importante</span>
+                <span style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)"}}>Regras de uso do cupom</span>
+              </div>
+              <span style={{fontFamily:T.sans,fontSize:14,color:"rgba(255,255,255,0.2)",flexShrink:0,transition:"transform 0.2s"}}>+</span>
+            </summary>
+
+            <div style={{marginTop:28,display:"flex",flexDirection:"column",gap:20,paddingBottom:8}}>
+              {[
+                {
+                  titulo:"Proibido comentarios com cupons",
+                  texto:"E vedado comentar seus cupons em publicacoes oficiais da nossa marca, ou de nossos seguidores."
+                },
+                {
+                  titulo:"Compartilhamento privado indevido",
+                  texto:"O envio de cupons por mensagem privada para nossos clientes e seguidores tambem nao e permitido."
+                },
+                {
+                  titulo:"Criacao de contas somente para divulgacao",
+                  texto:"A criacao de contas com o unico proposito de divulgar cupons e estritamente proibida."
+                },
+              ].map(function(r,i){
+                return (
+                  <div key={i} style={{display:"flex",gap:14,paddingBottom:20,borderBottom:i<2?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                    <span style={{fontFamily:T.serif,fontSize:13,color:"rgba(255,255,255,0.15)",flexShrink:0,marginTop:1}}>0{i+1}</span>
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)",marginBottom:5}}>{r.titulo}</p>
+                      <p style={{fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.22)",lineHeight:1.8}}>{r.texto}</p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <p style={{fontFamily:T.sans,fontSize:10,color:"rgba(255,255,255,0.15)",lineHeight:1.8,marginTop:4}}>
+                O descumprimento dessas regras pode resultar no cancelamento do cupom e desligamento do programa, sem direito a comissoes pendentes. Consulte o contrato completo para todas as condições.
+              </p>
+            </div>
+          </details>
         </div>
       </section>
 
