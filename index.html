@@ -77,7 +77,6 @@ const CONFIG = {
   JANELA_DEVOLUCAO:    7,
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
 
-};
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
@@ -1002,7 +1001,7 @@ function PageAdmin({ user, onLogout }) {
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
 
-        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp","chat","importar"]} labels={{embaixadores:"Embaixadores ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar"}} active={tab} onChange={setTab}/>
+        <Tabs tabs={["embaixadores","resgates","fila","ranking","banner","whatsapp","chat","importar","estreia"]} labels={{embaixadores:"Embaixadores ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar",estreia:"Pre-estreia"}} active={tab} onChange={setTab}/>
 
         {/* TAB EMBAIXADORES */}
         {tab==="embaixadores"&&(
@@ -1163,6 +1162,10 @@ function PageAdmin({ user, onLogout }) {
 
         {tab==="importar" && (
           <PageImportar onImported={load} />
+        )}
+
+        {tab==="estreia" && (
+          <PagePreEstreia />
         )}
 
         {tab==="whatsapp" && (
@@ -1417,6 +1420,129 @@ function PageChat({ embs, onUnread }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+
+// ── PRÉ-ESTREIA PAGE ──────────────────────────────────────────────────────────
+function PagePreEstreia() {
+  const [lista, setLista] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [form, setForm] = React.useState({nome:"", telefone:""});
+  const [salvando, setSalvando] = React.useState(false);
+  const [msg, setMsg] = React.useState({text:"",ok:false});
+  const [busca, setBusca] = React.useState("");
+  const setF = function(k,v){ setForm(function(p){ return {...p,[k]:v}; }); };
+
+  async function load() {
+    setLoading(true);
+    const {data} = await supabase.from("pre_estreia").select("*").order("criado_em", {ascending:false});
+    // Check which phones are already registered as embaixadores
+    const {data: embs} = await supabase.from("embaixadores").select("whatsapp");
+    const fones = (embs||[]).map(function(e){ return String(e.whatsapp||"").replace(/[^0-9]/g,"").slice(-8); });
+    const enriched = (data||[]).map(function(c){
+      const fone = String(c.telefone||"").replace(/[^0-9]/g,"").slice(-8);
+      return {...c, cadastrado: fones.includes(fone)};
+    });
+    setLista(enriched);
+    setLoading(false);
+  }
+
+  React.useEffect(function(){ load(); }, []);
+
+  async function salvar() {
+    if(!form.nome||!form.telefone){ setMsg({text:"Preencha nome e telefone.",ok:false}); return; }
+    setSalvando(true); setMsg({text:"",ok:false});
+    const {error} = await supabase.from("pre_estreia").insert({nome:form.nome, telefone:form.telefone.replace(/[^0-9]/g,"")});
+    if(error){ setMsg({text:"Erro: "+error.message,ok:false}); }
+    else { setMsg({text:"Contato adicionado!",ok:true}); setForm({nome:"",telefone:""}); load(); }
+    setSalvando(false);
+  }
+
+  async function remover(id) {
+    if(!confirm("Remover este contato?")) return;
+    await supabase.from("pre_estreia").delete().eq("id",id);
+    load();
+  }
+
+  const filtrada = lista.filter(function(c){
+    if(!busca) return true;
+    return c.nome.toLowerCase().includes(busca.toLowerCase()) || c.telefone.includes(busca);
+  });
+
+  const totalDisparos = lista.reduce(function(s,c){ return s+(c.disparos||0); },0);
+  const totalCadastrados = lista.filter(function(c){ return c.cadastrado; }).length;
+
+  return (
+    <div className="fade-in" style={{maxWidth:760}}>
+      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",color:T.g400,textTransform:"uppercase",marginBottom:4}}>Programa</p>
+      <h2 style={{fontFamily:T.serif,fontSize:32,fontWeight:300,marginBottom:8}}>Pré-estreia</h2>
+      <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,marginBottom:32}}>Clientes selecionados para convite antecipado ao programa</p>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:1,background:T.g200,border:"1px solid "+T.g200,marginBottom:40}}>
+        {[[lista.length,"Convidados"],[totalCadastrados,"Cadastrados"],[totalDisparos,"Disparos"]].map(function(arr,i){
+          return (
+            <div key={i} style={{background:T.white,padding:"20px 24px"}}>
+              <p style={{fontFamily:T.serif,fontSize:28,fontWeight:300,marginBottom:4}}>{arr[0]}</p>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",color:T.g400}}>{arr[1]}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Formulário */}
+      <div style={{border:"1px solid "+T.g200,padding:24,marginBottom:32}}>
+        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:16}}>Adicionar contato</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:12,alignItems:"end"}}>
+          <Input label="Nome" value={form.nome} onChange={function(e){setF("nome",e.target.value);}}/>
+          <Input label="Telefone (WhatsApp)" value={form.telefone} onChange={function(e){setF("telefone",e.target.value);}} placeholder="11999998888"/>
+          <button onClick={salvar} disabled={salvando}
+            style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",background:salvando?T.g200:T.black,color:T.white,border:"none",cursor:"pointer",height:40,whiteSpace:"nowrap"}}>
+            {salvando?"Salvando...":"+ Adicionar"}
+          </button>
+        </div>
+        {msg.text && <Alert msg={msg.text} ok={msg.ok}/>}
+      </div>
+
+      {/* Busca */}
+      <div style={{marginBottom:16}}>
+        <Input label="" value={busca} onChange={function(e){setBusca(e.target.value);}} placeholder="Buscar por nome ou telefone..."/>
+      </div>
+
+      {/* Lista */}
+      {loading ? <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Carregando...</p> : (
+        <div style={{border:"1px solid "+T.g200}}>
+          {/* Header */}
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1.5fr 1fr 1fr auto",gap:16,padding:"10px 16px",borderBottom:"1px solid "+T.g200,background:"#fafafa"}}>
+            {["Nome","Telefone","Disparos","Cadastrado",""].map(function(h,i){
+              return <p key={i} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400}}>{h}</p>;
+            })}
+          </div>
+          {filtrada.length === 0 && (
+            <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,padding:24}}>Nenhum contato ainda.</p>
+          )}
+          {filtrada.map(function(c){
+            return (
+              <div key={c.id} style={{display:"grid",gridTemplateColumns:"2fr 1.5fr 1fr 1fr auto",gap:16,padding:"14px 16px",borderBottom:"1px solid "+T.g200,alignItems:"center"}}>
+                <p style={{fontFamily:T.sans,fontSize:13}}>{c.nome}</p>
+                <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>{c.telefone}</p>
+                <p style={{fontFamily:T.sans,fontSize:13,textAlign:"center"}}>{c.disparos||0}</p>
+                <div>
+                  <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",padding:"4px 10px",border:"1px solid "+(c.cadastrado?"#2a7a2a":T.g200),color:c.cadastrado?"#2a7a2a":T.g400,background:c.cadastrado?"#f0fff0":"transparent"}}>
+                    {c.cadastrado?"Sim":"Não"}
+                  </span>
+                </div>
+                <button onClick={function(){remover(c.id);}}
+                  style={{fontFamily:T.sans,fontSize:11,color:"#c00",background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px"}}>
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1700,10 +1826,18 @@ function PageWhatsApp({ embs }) {
     return body ? body.text : "(sem preview)";
   }
 
+  const [listaEstreia, setListaEstreia] = React.useState([]);
+  React.useEffect(function(){
+    if(destino === "estreia") {
+      supabase.from("pre_estreia").select("*").then(function(r){ setListaEstreia(r.data||[]); });
+    }
+  }, [destino]);
+
   function destinatarios() {
     if(destino === "todos") return embs.filter(function(e){ return e.status === "ativo"; });
     if(destino === "destaque") return embs.filter(function(e){ return e.nivel === "destaque" || e.nivel === "influenciador"; });
     if(destino === "selecao") return embs.filter(function(e){ return embSel.includes(e.id); });
+    if(destino === "estreia") return listaEstreia.map(function(c){ return {id:c.id, nome:c.nome, whatsapp:c.telefone, cupom:"", disparos:c.disparos, _estreia:true}; });
     return [];
   }
 
@@ -1717,7 +1851,7 @@ function PageWhatsApp({ embs }) {
 
     // Map variable positions to data
     // Convention: {{1}} = nome, {{2}} = link painel, {{3}} = cupom
-    const portalUrl = "https://embaixadores.saintgermainbrand.com.br/#login";
+    const portalUrl = "https://embaixadores.saintgermainbrand.com.br";
     const params = [
       emb.nome || "",
       portalUrl,
@@ -1762,6 +1896,9 @@ function PageWhatsApp({ embs }) {
         const data = await res.json();
         if(data.error) throw new Error(data.error.message);
         setSendLog(function(l){ return [...l, {nome:emb.nome,ok:true,msg:"Enviado"}]; });
+        if(emb._estreia) {
+          await supabase.from("pre_estreia").update({disparos: (emb.disparos||0)+1}).eq("id", emb.id);
+        }
       } catch(e) {
         setSendLog(function(l){ return [...l, {nome:emb.nome,ok:false,msg:e.message}]; });
       }
@@ -1802,7 +1939,7 @@ function PageWhatsApp({ embs }) {
         {/* Destinatários */}
         <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:T.g400,textTransform:"uppercase",marginBottom:8}}>Destinatários</p>
         <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-          {[["todos","Todos ativos"],["destaque","Destaque e Influenciadores"],["selecao","Seleção manual"]].map(function([v,l]){
+          {[["todos","Todos ativos"],["destaque","Destaque e Influenciadores"],["estreia","Pré-estreia"],["selecao","Seleção manual"]].map(function([v,l]){
             return (
               <button key={v} onClick={function(){ setDestino(v); }}
                 style={{fontFamily:T.sans,fontSize:11,padding:"8px 16px",border:"1px solid "+(destino===v?T.black:T.g200),background:destino===v?T.black:T.white,color:destino===v?T.white:T.black,cursor:"pointer",letterSpacing:"0.08em",textTransform:"uppercase"}}>
