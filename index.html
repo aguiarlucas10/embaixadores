@@ -85,6 +85,7 @@ const CONFIG = {
   META_TOKEN:          "EAA8IELAR7LUBQzhJWDGJN36DJVju4w29Nu1ilYqNSFgOLTDYk2gKwX90HnEc5xsauZCMPZB7WgmAi6joKXcT2ZB9BdXOuiD4I6DJ8CcwYTrsfIfmajC8GxhjgaGkCE8XcPIYJZCF9JziKZBuZCZCWPvRlTvdkXeASK0JdTyH57qIvfFJLXbZBPYwPEalKk4EFp59bgZDZD",
   
   COMISSAO_PCT:        0.10,
+  DESCONTO_PCT:        0.10,
   JANELA_DEVOLUCAO:    7,
   ADMIN_EMAILS:        ["adminsg@saintgermain.com.br"],
 
@@ -118,7 +119,7 @@ const NS = {
       const r = await fetch(`${this.proxy}?action=create_coupon`, {
         method: "POST",
         headers: this.h,
-        body: JSON.stringify({ code, percentage: CONFIG.COMISSAO_PCT * 100 }),
+        body: JSON.stringify({ code, percentage: CONFIG.DESCONTO_PCT * 100 }),
       });
       const data = await r.json();
       console.log("createCoupon response:", JSON.stringify(data));
@@ -558,7 +559,7 @@ function PageCadastro({ onNavigate }) {
         <div style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",padding:"24px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,marginBottom:40}}>
           <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)"}}>Seu cupom exclusivo</span>
           <span style={{fontFamily:T.sans,fontSize:30,letterSpacing:"0.25em",color:"#fff"}}>{cupomFinal}</span>
-          <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:"rgba(255,255,255,0.35)",marginTop:2}}>{(CONFIG.COMISSAO_PCT*100).toFixed(0)}% desconto — {(CONFIG.COMISSAO_PCT*100).toFixed(0)}% comissão por venda</span>
+          <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:"rgba(255,255,255,0.35)",marginTop:2}}>{(CONFIG.DESCONTO_PCT*100).toFixed(0)}% desconto — {(CONFIG.COMISSAO_PCT*100).toFixed(0)}% comissão por venda</span>
         </div>
         <div style={{borderTop:"1px solid rgba(255,255,255,0.1)",paddingTop:32,marginBottom:32}}>
           <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:24,color:"rgba(255,255,255,0.4)"}}>Crie sua senha de acesso</p>
