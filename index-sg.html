@@ -514,6 +514,8 @@ function PageAdmin({user,onLogout}){
   const [embs,setEmbs]=React.useState([]);
   const [ress,setRess]=React.useState([]);
   const [todosResgates,setTodosResgates]=React.useState([]);
+  const [fila,setFila]=React.useState([]);
+  const [unread,setUnread]=React.useState(0);
   const [loading,setLoading]=React.useState(true);
   const [busca,setBusca]=React.useState("");
   const [ordemEmb,setOrdemEmb]=React.useState("data");
@@ -564,6 +566,11 @@ function PageAdmin({user,onLogout}){
     setRess(r||[]);
     const {data:tr}=await supabase.from("resgates_sg").select("*, embaixadores_sg(nome,email,cupom,pix_key)").order("criado_em",{ascending:false});
     setTodosResgates(tr||[]);
+    const ontem=new Date(Date.now()-86400000).toISOString();
+    const {data:novos}=await supabase.from("embaixadores_sg").select("id,nome,whatsapp,cupom,criado_em").gte("criado_em",ontem);
+    const t30=new Date(Date.now()-30*86400000).toISOString();
+    const {data:inat}=await supabase.from("embaixadores_sg").select("id,nome,whatsapp,cupom,ultimo_acesso").lt("ultimo_acesso",t30).eq("status","ativo");
+    setFila([...(novos||[]).map(x=>({...x,motivo:"Novo cadastro - boas-vindas",p:"alta"})),...(inat||[]).map(x=>({...x,motivo:"Inativo +30d - reengajar",p:"media"}))]);
     const {data:b}=await supabase.from("config").select("valor").eq("chave","banner_sg_ativo").maybeSingle();
     if(b?.valor)setBanner(b.valor);
     const {data:bc}=await supabase.from("config").select("valor").eq("chave","banner_sg_caption").maybeSingle();
@@ -612,6 +619,7 @@ function PageAdmin({user,onLogout}){
     setDash({timeline,totalFat,totalCom,totalPed,ticketMedio,ativas,comVenda,cadPeriodo,top10,resgPorMes});
   }
 
+  async function feito(id){await supabase.from("embaixadores_sg").update({ultimo_contato:new Date().toISOString()}).eq("id",id);setFila(f=>f.filter(x=>x.id!==id));}
   async function salvarBanner(ev){
     const file=ev.target.files?.[0]; if(!file)return;
     setUploadando(true); setMsgBanner({text:"",ok:false});
@@ -732,9 +740,16 @@ function PageAdmin({user,onLogout}){
         </div>
       )}
 
+      {/* Header stats */}
+      <div style={{padding:"0 48px 32px",maxWidth:1200}}>
+        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:8}}>Gestao</p>
+        <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300,marginBottom:32}}>Embaixadoras SG</h2>
+        <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativas"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
+      </div>
+
       <Tabs
-        tabs={["dashboard","embaixadoras","resgates","financeiro","banner","importar"]}
-        labels={{dashboard:"Dashboard",embaixadoras:"Embaixadoras ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),financeiro:"Financeiro",banner:"Banner",importar:"Importar CSV"}}
+        tabs={["dashboard","embaixadoras","resgates","financeiro","fila","ranking","banner","whatsapp","chat","importar","estreia"]}
+        labels={{dashboard:"Dashboard",embaixadoras:"Embaixadoras ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),financeiro:"Financeiro",fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar",estreia:"Pre-estreia"}}
         active={tab} onChange={setTab}>
 
 
@@ -754,6 +769,7 @@ function PageAdmin({user,onLogout}){
                   </button>
                 ))}
                 <button onClick={()=>setDashModo("custom")} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",border:`1px solid ${T.g200}`,padding:"8px 14px",cursor:"pointer",background:dashModo==="custom"?T.black:"transparent",color:dashModo==="custom"?T.white:T.g600}}>Personalizado</button>
+                {dashModo==="preset"&&<span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:4}}>Ultimos {dashPeriodo} dias</span>}
                 {dashModo==="custom"&&(
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
                     <input type="date" value={dashCustomDe} onChange={e=>setDashCustomDe(e.target.value)} style={{fontFamily:T.sans,fontSize:12,border:`1px solid ${T.g200}`,padding:"7px 10px",outline:"none"}}/>
@@ -765,26 +781,39 @@ function PageAdmin({user,onLogout}){
             </div>
             {!dash?<Spinner/>:(
               <>
-                <StatGrid cols={4} items={[
-                  [brl(dash.totalFat),"Faturamento"],
-                  [brl(dash.totalCom),"Comissoes geradas"],
-                  [dash.totalPed,"Pedidos pagos"],
-                  [brl(dash.ticketMedio),"Ticket medio"],
-                  [dash.ativas,"Embaixadoras ativas"],
-                  [dash.comVenda,"Com venda no periodo"],
-                  [dash.cadPeriodo,"Novos cadastros"],
-                  [embs.length,"Total cadastradas"],
-                ]}/>
-                <div style={{marginBottom:40}}>
-                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:16}}>Faturamento diario</p>
+                {/* KPI cards - mesmo estilo do portal principal */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:1,background:T.g200,border:`1px solid ${T.g200}`,marginBottom:48}}>
+                  {[
+                    ["Faturamento",   brl(dash.totalFat),        "pedidos pagos no periodo"],
+                    ["Comissoes",     brl(dash.totalCom),        "geradas no periodo"],
+                    ["Pedidos",       dash.totalPed,             "com cupom"],
+                    ["Ticket medio",  brl(dash.ticketMedio),     "por pedido"],
+                    ["Ativas",        dash.ativas,               "embaixadoras"],
+                    ["Com venda",     dash.comVenda,             "venderam no periodo"],
+                    ["Novos cad.",    dash.cadPeriodo,           "no periodo"],
+                    ["Total cad.",    embs.length,               "embaixadoras"],
+                  ].map(([label,val,sub])=>(
+                    <div key={label} style={{padding:"20px 20px",background:T.white}}>
+                      <p style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>{label}</p>
+                      <p style={{fontFamily:T.serif,fontSize:28,fontWeight:300,lineHeight:1,marginBottom:4}}>{val}</p>
+                      <p style={{fontFamily:T.sans,fontSize:10,color:T.g400,lineHeight:1.4}}>{sub}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{marginBottom:48}}>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Faturamento diario</p>
+                  <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Pedidos pagos (preto) vs comissao gerada (cinza)</p>
                   <BarChartSVG data={dash.timeline} valueKey="fat" labelKey="data" isCurrency={true} secondKey="comissao" secondLabel="Comissao"/>
                 </div>
-                <div style={{marginBottom:40}}>
-                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:16}}>Cadastros por dia</p>
+                <div style={{marginBottom:48}}>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Cadastros e visitas diarias</p>
+                  <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Cadastros (barra)</p>
                   <BarChartSVG data={dash.timeline} valueKey="cadastros" labelKey="data" isCurrency={false}/>
                 </div>
-                <div style={{marginBottom:40}}>
-                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:16}}>Resgates por mes</p>
+                <div style={{marginBottom:48}}>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Resgates por mes</p>
+                  <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Ultimos 6 meses</p>
                   <BarChartSVG data={dash.resgPorMes} valueKey="valor" labelKey="mes" isCurrency={true}/>
                 </div>
                 {dash.top10.length>0&&(
@@ -1042,10 +1071,903 @@ function PageAdmin({user,onLogout}){
           </div>
         )}
 
+        {/* TAB FILA */}
+        {tab==="fila"&&(
+          <div className="fade-in">
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:24}}>Envio manual via WhatsApp</p>
+            {fila.length===0?<p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhuma comunicacao pendente.</p>
+            :fila.map(c=>(
+              <Row key={c.id}
+                left={<div><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:2}}><p style={{fontFamily:T.sans,fontSize:13}}>{c.nome}</p><Badge text={c.p==="alta"?"Novo":"Inativo"} color={c.p==="alta"?T.black:T.g400}/></div><p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{c.whatsapp}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g500,marginTop:2}}>{c.motivo}</p></div>}
+                right={<div style={{display:"flex",gap:8,marginLeft:16,flexShrink:0}}>
+                  <a href={`https://wa.me/55${(c.whatsapp||"").replace(/[^0-9]/g,"")}?text=Oi ${(c.nome||"").split(" ")[0]}!`} target="_blank" rel="noopener noreferrer"><BtnSecondary style={{padding:"10px 16px",fontSize:10}}>Abrir WA</BtnSecondary></a>
+                  <BtnGhost onClick={()=>feito(c.id)} style={{fontSize:10}}>Feito ✓</BtnGhost>
+                </div>}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* TAB RANKING */}
+        {tab==="ranking"&&(
+          <div className="fade-in" style={{maxWidth:600}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:8}}>Top Embaixadoras</p>
+            <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,lineHeight:1.7,marginBottom:32}}>Ranking por vendas confirmadas.</p>
+            {embs.length===0
+              ?<p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhuma embaixadora cadastrada.</p>
+              :(() => {
+                  const sorted=[...embs].sort((a,b)=>{
+                    const fa=(a.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0);
+                    const fb=(b.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0);
+                    return fb-fa;
+                  });
+                  return sorted.slice(0,10).map((e,i)=>(
+                    <div key={e.id} style={{display:"flex",alignItems:"center",gap:16,padding:"16px 0",borderBottom:`1px solid ${T.g100}`}}>
+                      <div style={{width:32,height:32,background:i<3?T.black:T.g100,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontFamily:T.sans,fontSize:12,fontWeight:600,color:i<3?T.white:T.g400}}>#{i+1}</span>
+                      </div>
+                      <div style={{flex:1}}>
+                        <p style={{fontFamily:T.sans,fontSize:13}}>{e.nome}</p>
+                        <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:2}}>{e.cupom}</p>
+                      </div>
+                      <a href={`https://wa.me/55${(e.whatsapp||"").replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer"
+                        style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",color:T.g400,textDecoration:"none"}}>
+                        WhatsApp -&gt;
+                      </a>
+                    </div>
+                  ));
+                })()
+            }
+          </div>
+        )}
+
+        {/* TAB WHATSAPP */}
+        {tab==="whatsapp"&&(
+          <PageWhatsApp embs={embs}/>
+        )}
+
+        {/* TAB CHAT */}
+        {tab==="chat"&&(
+          <PageChat embs={embs} onUnread={setUnread}/>
+        )}
+
+        {/* TAB PRE-ESTREIA */}
+        {tab==="estreia"&&(
+          <PagePreEstreia/>
+        )}
+
+
       </Tabs>
     </div>
   );
 }
+
+
+
+function BtnGhost({ children, onClick, style:sx={} }) {
+  return (
+    <button className="sg-btn-ghost" onClick={onClick}
+      style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:"none",cursor:"pointer",color:T.g400,transition:"color 0.15s",...sx}}>
+      {children}
+    </button>
+  );
+}
+
+
+function Row({ left, right }) {
+  return (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.g100}`,padding:"14px 0"}}>
+      {left}{right}
+    </div>
+  );
+}
+
+
+function PageChat({ embs, onUnread }) {
+  const [conversas, setConversas] = React.useState([]);
+  const [ativa, setAtiva] = React.useState(null);
+  const [msgs, setMsgs] = React.useState([]);
+  const [texto, setTexto] = React.useState("");
+  const [enviando, setEnviando] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+  const msgsEndRef = React.useRef(null);
+
+  React.useEffect(function() {
+    carregarConversas();
+    const interval = setInterval(carregarConversas, 15000);
+    return function(){ clearInterval(interval); };
+  }, []);
+
+  React.useEffect(function() {
+    if(ativa) carregarMensagens(ativa.telefone);
+  }, [ativa]);
+
+  React.useEffect(function() {
+    if(msgsEndRef.current) msgsEndRef.current.scrollIntoView({behavior:"smooth"});
+  }, [msgs]);
+
+  async function carregarConversas() {
+    const { data } = await supabase
+      .from("mensagens_whatsapp")
+      .select("telefone,nome_contato,conteudo,direcao,lida,criado_em")
+      .order("criado_em", {ascending:false});
+
+    if(!data) { setLoading(false); return; }
+
+    // Group by telefone - last message per contact
+    const map = {};
+    data.forEach(function(m) {
+      if(!map[m.telefone]) map[m.telefone] = {...m, nao_lidas: 0};
+      if(!m.lida && m.direcao === "recebida") map[m.telefone].nao_lidas++;
+    });
+
+    const lista = Object.values(map).sort(function(a,b){ return new Date(b.criado_em) - new Date(a.criado_em); });
+    setConversas(lista);
+    const totalNaoLidas = lista.reduce(function(s,c){ return s + c.nao_lidas; }, 0);
+    onUnread(totalNaoLidas);
+    setLoading(false);
+  }
+
+  async function carregarMensagens(telefone) {
+    const { data } = await supabase
+      .from("mensagens_whatsapp")
+      .select("*")
+      .eq("telefone", telefone)
+      .order("criado_em", {ascending:true});
+    setMsgs(data || []);
+
+    // Marcar como lidas
+    await supabase.from("mensagens_whatsapp")
+      .update({lida:true})
+      .eq("telefone", telefone)
+      .eq("direcao", "recebida")
+      .eq("lida", false);
+
+    await carregarConversas();
+  }
+
+  function nomeContato(telefone) {
+    const conv = conversas.find(function(c){ return c.telefone === telefone; });
+    if(conv?.nome_contato) return conv.nome_contato;
+    const emb = embs.find(function(e){ return String(e.whatsapp||"").replace(/[^0-9]/g,"").includes(telefone.slice(-8)); });
+    return emb ? emb.nome : telefone;
+  }
+
+  async function enviarResposta() {
+    if(!texto.trim() || !ativa) return;
+    setEnviando(true);
+    const fone = ativa.telefone;
+    try {
+      const res = await fetch(
+        "https://graph.facebook.com/v19.0/" + CONFIG.META_PHONE_ID + "/messages",
+        {
+          method: "POST",
+          headers: {"Content-Type":"application/json", Authorization:"Bearer "+CONFIG.META_TOKEN},
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: fone,
+            type: "text",
+            text: { body: texto }
+          })
+        }
+      );
+      const data = await res.json();
+      if(data.error) throw new Error(data.error.message);
+
+      // Save sent message to DB
+      await supabase.from("mensagens_whatsapp").insert({
+        telefone: fone, direcao: "enviada",
+        conteudo: texto, lida: true,
+        nome_contato: nomeContato(fone)
+      });
+
+      setTexto("");
+      await carregarMensagens(fone);
+    } catch(e) { alert("Erro ao enviar: "+e.message); }
+    setEnviando(false);
+  }
+
+  function formatHora(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  }
+  function formatData(iso) {
+    return new Date(iso).toLocaleDateString("pt-BR");
+  }
+
+  if(loading) return <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Carregando conversas...</p>;
+
+  return (
+    <div className="fade-in" style={{display:"flex",gap:0,border:"1px solid "+T.g200,height:600,overflow:"hidden"}}>
+
+      {/* Lista de conversas */}
+      <div style={{width:280,borderRight:"1px solid "+T.g200,overflowY:"auto",flexShrink:0}}>
+        <div style={{padding:"16px 20px",borderBottom:"1px solid "+T.g200}}>
+          <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase"}}>Conversas</p>
+        </div>
+        {conversas.length === 0 && (
+          <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,padding:20}}>Nenhuma mensagem recebida ainda.</p>
+        )}
+        {conversas.map(function(c) {
+          const sel = ativa?.telefone === c.telefone;
+          return (
+            <div key={c.telefone} onClick={function(){ setAtiva(c); }}
+              style={{padding:"14px 20px",borderBottom:"1px solid "+T.g200,cursor:"pointer",background:sel?T.g100:"transparent"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                <p style={{fontFamily:T.sans,fontSize:13,fontWeight:sel?600:400}}>{nomeContato(c.telefone)}</p>
+                {c.nao_lidas > 0 && (
+                  <span style={{background:T.black,color:T.white,fontFamily:T.sans,fontSize:10,borderRadius:10,padding:"2px 7px",flexShrink:0}}>{c.nao_lidas}</span>
+                )}
+              </div>
+              <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
+                {c.direcao==="enviada"?"Você: ":""}{c.conteudo}
+              </p>
+              <p style={{fontFamily:T.sans,fontSize:10,color:T.g300,marginTop:4}}>{formatData(c.criado_em)}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Área de mensagens */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {!ativa ? (
+          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Selecione uma conversa</p>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{padding:"16px 20px",borderBottom:"1px solid "+T.g200,flexShrink:0}}>
+              <p style={{fontFamily:T.sans,fontSize:13,fontWeight:600}}>{nomeContato(ativa.telefone)}</p>
+              <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{ativa.telefone}</p>
+            </div>
+
+            {/* Mensagens */}
+            <div style={{flex:1,overflowY:"auto",padding:20,display:"flex",flexDirection:"column",gap:10}}>
+              {msgs.map(function(m) {
+                const sent = m.direcao === "enviada";
+                return (
+                  <div key={m.id} style={{display:"flex",justifyContent:sent?"flex-end":"flex-start"}}>
+                    <div style={{maxWidth:"72%",background:sent?T.black:T.g100,color:sent?T.white:T.black,padding:"10px 14px",borderRadius:2}}>
+                      <p style={{fontFamily:T.sans,fontSize:13,lineHeight:1.5}}>{m.conteudo}</p>
+                      <p style={{fontFamily:T.sans,fontSize:10,color:sent?"#aaa":T.g400,marginTop:4,textAlign:"right"}}>{formatHora(m.criado_em)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={msgsEndRef}/>
+            </div>
+
+            {/* Input */}
+            <div style={{padding:16,borderTop:"1px solid "+T.g200,display:"flex",gap:10,flexShrink:0}}>
+              <input
+                value={texto}
+                onChange={function(e){ setTexto(e.target.value); }}
+                onKeyDown={function(e){ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); enviarResposta(); } }}
+                placeholder="Digite sua mensagem..."
+                style={{flex:1,fontFamily:T.sans,fontSize:13,padding:"10px 14px",border:"1px solid "+T.g200,outline:"none"}}
+              />
+              <button onClick={enviarResposta} disabled={enviando||!texto.trim()}
+                style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",background:enviando||!texto.trim()?T.g200:T.black,color:T.white,border:"none",cursor:enviando||!texto.trim()?"not-allowed":"pointer",flexShrink:0}}>
+                {enviando ? "..." : "Enviar"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
+function PagePreEstreia() {
+  const [lista, setLista] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [form, setForm] = React.useState({nome:"", telefone:""});
+  const [salvando, setSalvando] = React.useState(false);
+  const [msg, setMsg] = React.useState({text:"",ok:false});
+  const [busca, setBusca] = React.useState("");
+  const [csvMode, setCsvMode] = React.useState(false);
+  const [csvPreview, setCsvPreview] = React.useState([]);
+  const [csvErros, setCsvErros] = React.useState([]);
+  const [importando, setImportando] = React.useState(false);
+  const [resImport, setResImport] = React.useState(null);
+  const setF = function(k,v){ setForm(function(p){ return {...p,[k]:v}; }); };
+
+  function parseCsvEstreia(text) {
+    setCsvPreview([]); setCsvErros([]); setResImport(null);
+    const lines = text.trim().split(String.fromCharCode(10));
+    if(lines.length < 2) { setCsvErros(["Arquivo vazio ou sem dados"]); return; }
+    const headers = lines[0].split(",").map(function(h){ return h.trim().replace(/"/g,"").toLowerCase(); });
+    if(!headers.includes("nome") || !headers.includes("telefone")) {
+      setCsvErros(["Colunas obrigatorias ausentes: nome e/ou telefone"]); return;
+    }
+    const rows = []; const erros = [];
+    for(let i=1; i<lines.length; i++) {
+      const vals = lines[i].split(",").map(function(v){ return v.trim().replace(/^"|"$/g,""); });
+      const row = {};
+      headers.forEach(function(h,idx){ row[h] = vals[idx]||""; });
+      if(!row.nome || !row.telefone) { erros.push("Linha "+(i+1)+": nome ou telefone vazio"); }
+      else { rows.push(row); }
+    }
+    setCsvPreview(rows); setCsvErros(erros);
+  }
+
+  function handleCsvFile(e) {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev){ parseCsvEstreia(ev.target.result); };
+    reader.readAsText(file, "UTF-8");
+  }
+
+  async function importarCsv() {
+    if(!csvPreview.length) return;
+    setImportando(true); setResImport(null);
+    let ok=0; const erros=[];
+    for(const row of csvPreview) {
+      const {error} = await supabase.from("pre_estreia").insert({
+        nome: row.nome,
+        telefone: row.telefone.replace(/[^0-9]/g,"")
+      });
+      if(error) { erros.push(row.nome+": "+error.message); } else { ok++; }
+    }
+    setResImport({ok, erros});
+    if(ok>0) load();
+    setImportando(false);
+  }
+
+  async function load() {
+    setLoading(true);
+    const {data} = await supabase.from("pre_estreia").select("*").order("criado_em", {ascending:false});
+    // Check which phones are already registered as embaixadores
+    const {data: embs} = await supabase.from("embaixadores").select("whatsapp");
+    const fones = (embs||[]).map(function(e){ return String(e.whatsapp||"").replace(/[^0-9]/g,"").slice(-8); });
+    const enriched = (data||[]).map(function(c){
+      const fone = String(c.telefone||"").replace(/[^0-9]/g,"").slice(-8);
+      return {...c, cadastrado: fones.includes(fone)};
+    });
+    setLista(enriched);
+    setLoading(false);
+  }
+
+  React.useEffect(function(){ load(); }, []);
+
+  async function salvar() {
+    if(!form.nome||!form.telefone){ setMsg({text:"Preencha nome e telefone.",ok:false}); return; }
+    setSalvando(true); setMsg({text:"",ok:false});
+    const {error} = await supabase.from("pre_estreia").insert({nome:form.nome, telefone:form.telefone.replace(/[^0-9]/g,"")});
+    if(error){ setMsg({text:"Erro: "+error.message,ok:false}); }
+    else { setMsg({text:"Contato adicionado!",ok:true}); setForm({nome:"",telefone:""}); load(); }
+    setSalvando(false);
+  }
+
+  async function remover(id) {
+    if(!confirm("Remover este contato?")) return;
+    await supabase.from("pre_estreia").delete().eq("id",id);
+    load();
+  }
+
+  const filtrada = lista.filter(function(c){
+    if(!busca) return true;
+    return c.nome.toLowerCase().includes(busca.toLowerCase()) || c.telefone.includes(busca);
+  });
+
+  const totalDisparos = lista.reduce(function(s,c){ return s+(c.disparos||0); },0);
+  const totalCadastrados = lista.filter(function(c){ return c.cadastrado; }).length;
+
+  return (
+    <div className="fade-in" style={{maxWidth:760}}>
+      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",color:T.g400,textTransform:"uppercase",marginBottom:4}}>Programa</p>
+      <h2 style={{fontFamily:T.serif,fontSize:32,fontWeight:300,marginBottom:8}}>Pré-estreia</h2>
+      <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,marginBottom:32}}>Clientes selecionados para convite antecipado ao programa</p>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:1,background:T.g200,border:"1px solid "+T.g200,marginBottom:40}}>
+        {[[lista.length,"Convidados"],[totalCadastrados,"Cadastrados"],[totalDisparos,"Disparos"]].map(function(arr,i){
+          return (
+            <div key={i} style={{background:T.white,padding:"20px 24px"}}>
+              <p style={{fontFamily:T.serif,fontSize:28,fontWeight:300,marginBottom:4}}>{arr[0]}</p>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",color:T.g400}}>{arr[1]}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Toggle manual / csv */}
+      <div style={{display:"flex",gap:0,marginBottom:24,borderBottom:"1px solid "+T.g200}}>
+        {[["manual","Adicionar manual"],["csv","Importar CSV"]].map(function(arr){
+          const v=arr[0],l=arr[1];
+          return (
+            <button key={v} onClick={function(){setCsvMode(v==="csv");setCsvPreview([]);setCsvErros([]);setResImport(null);setMsg({text:"",ok:false});}}
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"12px 24px",background:"transparent",border:"none",borderBottom:"2px solid "+(!csvMode&&v==="manual"||csvMode&&v==="csv"?T.black:"transparent"),color:(!csvMode&&v==="manual"||csvMode&&v==="csv"?T.black:T.g400),cursor:"pointer"}}>
+              {l}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Formulário manual */}
+      {!csvMode && (
+        <div style={{border:"1px solid "+T.g200,padding:24,marginBottom:32}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:12,alignItems:"end"}}>
+            <Input label="Nome" value={form.nome} onChange={function(e){setF("nome",e.target.value);}}/>
+            <Input label="Telefone (WhatsApp)" value={form.telefone} onChange={function(e){setF("telefone",e.target.value);}} placeholder="11999998888"/>
+            <button onClick={salvar} disabled={salvando}
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",background:salvando?T.g200:T.black,color:T.white,border:"none",cursor:"pointer",height:40,whiteSpace:"nowrap"}}>
+              {salvando?"Salvando...":"+ Adicionar"}
+            </button>
+          </div>
+          {msg.text && <Alert msg={msg.text} ok={msg.ok}/>}
+        </div>
+      )}
+
+      {/* Importar CSV */}
+      {csvMode && (
+        <div style={{border:"1px solid "+T.g200,padding:24,marginBottom:32}}>
+          <div style={{marginBottom:16,padding:"12px 16px",background:"#f9f9f9",border:"1px solid "+T.g200}}>
+            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:4}}>Colunas obrigatorias:</p>
+            <p style={{fontFamily:T.sans,fontSize:12,fontWeight:600,letterSpacing:"0.05em"}}>nome, telefone</p>
+            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:4}}>Coluna opcional: nenhuma — apenas nome e telefone sao necessarios</p>
+          </div>
+          <input type="file" accept=".csv" onChange={handleCsvFile} style={{fontFamily:T.sans,fontSize:12,cursor:"pointer",marginBottom:16}}/>
+          {csvErros.length>0 && (
+            <div style={{background:"#fff0f0",border:"1px solid #fcc",padding:12,marginBottom:12}}>
+              {csvErros.map(function(e,i){ return <p key={i} style={{fontFamily:T.sans,fontSize:12,color:"#c00"}}>{e}</p>; })}
+            </div>
+          )}
+          {csvPreview.length>0 && (
+            <div style={{marginBottom:16}}>
+              <p style={{fontFamily:T.sans,fontSize:12,color:T.g400,marginBottom:8}}>{csvPreview.length} contato{csvPreview.length!==1?"s":""} encontrados</p>
+              <div style={{border:"1px solid "+T.g200,maxHeight:180,overflowY:"auto",marginBottom:12}}>
+                {csvPreview.slice(0,5).map(function(r,i){
+                  return (
+                    <div key={i} style={{display:"flex",gap:24,padding:"8px 12px",borderBottom:"1px solid "+T.g200,fontFamily:T.sans,fontSize:12}}>
+                      <span style={{flex:2}}>{r.nome}</span>
+                      <span style={{flex:2,color:T.g400}}>{r.telefone}</span>
+                    </div>
+                  );
+                })}
+                {csvPreview.length>5 && <p style={{padding:"6px 12px",fontFamily:T.sans,fontSize:11,color:T.g400}}>+{csvPreview.length-5} mais...</p>}
+              </div>
+              <button onClick={importarCsv} disabled={importando}
+                style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"12px 28px",background:importando?T.g200:T.black,color:T.white,border:"none",cursor:importando?"not-allowed":"pointer"}}>
+                {importando?"Importando...":"Importar "+csvPreview.length+" contatos"}
+              </button>
+            </div>
+          )}
+          {resImport && (
+            <div style={{padding:16,border:"1px solid "+T.g200,marginTop:8}}>
+              <p style={{fontFamily:T.sans,fontSize:13,fontWeight:600,color:resImport.ok>0?"#2a7a2a":"#c00",marginBottom:4}}>
+                {resImport.ok} importado{resImport.ok!==1?"s":""} com sucesso
+              </p>
+              {resImport.erros.map(function(e,i){ return <p key={i} style={{fontFamily:T.sans,fontSize:11,color:"#c00"}}>{e}</p>; })}
+            </div>
+          )}
+          <div style={{marginTop:20,paddingTop:16,borderTop:"1px solid "+T.g200}}>
+            <button onClick={function(){
+              const blob = new Blob(["nome,telefone"+String.fromCharCode(10)+"Maria Silva,11999998888"], {type:"text/csv;charset=utf-8;"});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a"); a.href=url; a.download="modelo_pre_estreia.csv"; a.click();
+              URL.revokeObjectURL(url);
+            }} style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",border:"1px solid "+T.g200,background:"transparent",cursor:"pointer"}}>
+              Baixar modelo CSV
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Busca */}
+      <div style={{marginBottom:16}}>
+        <Input label="" value={busca} onChange={function(e){setBusca(e.target.value);}} placeholder="Buscar por nome ou telefone..."/>
+      </div>
+
+      {/* Lista */}
+      {loading ? <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Carregando...</p> : (
+        <div style={{border:"1px solid "+T.g200}}>
+          {/* Header */}
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1.5fr 1fr 1fr auto",gap:16,padding:"10px 16px",borderBottom:"1px solid "+T.g200,background:"#fafafa"}}>
+            {["Nome","Telefone","Disparos","Cadastrado",""].map(function(h,i){
+              return <p key={i} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400}}>{h}</p>;
+            })}
+          </div>
+          {filtrada.length === 0 && (
+            <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,padding:24}}>Nenhum contato ainda.</p>
+          )}
+          {filtrada.map(function(c){
+            return (
+              <div key={c.id} style={{display:"grid",gridTemplateColumns:"2fr 1.5fr 1fr 1fr auto",gap:16,padding:"14px 16px",borderBottom:"1px solid "+T.g200,alignItems:"center"}}>
+                <p style={{fontFamily:T.sans,fontSize:13}}>{c.nome}</p>
+                <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>{c.telefone}</p>
+                <p style={{fontFamily:T.sans,fontSize:13,textAlign:"center"}}>{c.disparos||0}</p>
+                <div>
+                  <span style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",padding:"4px 10px",border:"1px solid "+(c.cadastrado?"#2a7a2a":T.g200),color:c.cadastrado?"#2a7a2a":T.g400,background:c.cadastrado?"#f0fff0":"transparent"}}>
+                    {c.cadastrado?"Sim":"Não"}
+                  </span>
+                </div>
+                <button onClick={function(){remover(c.id);}}
+                  style={{fontFamily:T.sans,fontSize:11,color:"#c00",background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px"}}>
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+function PageWhatsApp({ embs }) {
+  const [templates, setTemplates] = React.useState([]);
+  const [loadingTpl, setLoadingTpl] = React.useState(false);
+  const [tplError, setTplError] = React.useState("");
+  const [selectedTpl, setSelectedTpl] = React.useState(null);
+  const [destino, setDestino] = React.useState("todos");
+  const [embSel, setEmbSel] = React.useState([]);
+  const [sending, setSending] = React.useState(false);
+  const [sendLog, setSendLog] = React.useState([]);
+  const [agendando, setAgendando] = React.useState(false);
+  const [agendado, setAgendado] = React.useState(null); // {date, time}
+  const [agendamentos, setAgendamentos] = React.useState([]);
+
+  React.useEffect(function(){ carregarAgendamentos(); }, []);
+
+  async function carregarAgendamentos() {
+    const { data } = await supabase
+      .from("agendamentos_disparo")
+      .select("*")
+      .eq("status","pendente")
+      .order("agendado_para", {ascending:true});
+    setAgendamentos(data||[]);
+  }
+
+  async function salvarAgendamento() {
+    if(!selectedTpl) { alert("Selecione um template."); return; }
+    if(!agendado || !agendado.date || !agendado.time) { alert("Selecione data e horario."); return; }
+    const lista = destinatarios();
+    if(!lista.length) { alert("Nenhum destinatario selecionado."); return; }
+    const datetime = new Date(agendado.date + "T" + agendado.time + ":00");
+    if(datetime <= new Date()) { alert("Selecione uma data e horario futuros."); return; }
+    const destinatariosJson = lista.map(function(e){ return {id:e.id, nome:e.nome, whatsapp:e.whatsapp, cupom:e.cupom||"", _estreia:e._estreia||false}; });
+    const { error } = await supabase.from("agendamentos_disparo").insert({
+      agendado_para: datetime.toISOString(),
+      template_name: selectedTpl.name,
+      template_language: selectedTpl.language,
+      destino: destino,
+      destinatarios: destinatariosJson,
+      total: lista.length,
+      status: "pendente"
+    });
+    if(error) { alert("Erro ao agendar: " + error.message); return; }
+    await carregarAgendamentos();
+    setAgendando(false);
+    setAgendado(null);
+    alert("Disparo agendado para " + datetime.toLocaleString("pt-BR") + " para " + lista.length + " destinatarios.");
+  }
+
+  async function cancelarAgendamento(id) {
+    if(!confirm("Cancelar este agendamento?")) return;
+    await supabase.from("agendamentos_disparo").update({status:"cancelado"}).eq("id",id);
+    await carregarAgendamentos();
+  }
+  const [automacoes, setAutomacoes] = React.useState({
+    novo_cadastro: { ativo: false, template: "" },
+    marco_atingido: { ativo: false, template: "" },
+    resgate_solicitado: { ativo: false, template: "" },
+    inativo_30d: { ativo: false, template: "" },
+  });
+  const [savingAuto, setSavingAuto] = React.useState(false);
+  const [msgAuto, setMsgAuto] = React.useState("");
+
+  const autoLabels = {
+    novo_cadastro: "Novo cadastro aprovado",
+    marco_atingido: "Marco de vendas atingido",
+    resgate_solicitado: "Resgate solicitado",
+    inativo_30d: "Embaixador inativo há 30 dias",
+  };
+
+  React.useEffect(function() {
+    carregarTemplates();
+    carregarAutomacoes();
+  }, []);
+
+  async function carregarTemplates() {
+    setLoadingTpl(true); setTplError("");
+    try {
+      const res = await fetch(
+        "https://graph.facebook.com/v19.0/" + CONFIG.META_WABA_ID + "/message_templates?fields=name,status,language,components&limit=50",
+        { headers: { Authorization: "Bearer " + CONFIG.META_TOKEN } }
+      );
+      const data = await res.json();
+      if(data.error) { setTplError(data.error.message); setLoadingTpl(false); return; }
+      const aprovados = (data.data || []).filter(function(t) { return t.status === "APPROVED"; });
+      setTemplates(aprovados);
+    } catch(e) { setTplError("Erro ao carregar templates: " + e.message); }
+    setLoadingTpl(false);
+  }
+
+  async function carregarAutomacoes() {
+    const { data } = await supabase.from("config").select("*").eq("chave","whatsapp_automacoes").maybeSingle();
+    if(data?.valor) { try { setAutomacoes(JSON.parse(data.valor)); } catch(e){} }
+  }
+
+  async function salvarAutomacoes() {
+    setSavingAuto(true); setMsgAuto("");
+    await supabase.from("config").upsert({chave:"whatsapp_automacoes", valor: JSON.stringify(automacoes)},{onConflict:"chave"});
+    setSavingAuto(false); setMsgAuto("Automações salvas!");
+    setTimeout(function(){ setMsgAuto(""); }, 3000);
+  }
+
+  function tplPreview(tpl) {
+    if(!tpl) return "";
+    const body = (tpl.components || []).find(function(c){ return c.type === "BODY"; });
+    return body ? body.text : "(sem preview)";
+  }
+
+  const [listaEstreia, setListaEstreia] = React.useState([]);
+  React.useEffect(function(){
+    if(destino === "estreia") {
+      supabase.from("pre_estreia").select("*").then(function(r){ setListaEstreia(r.data||[]); });
+    }
+  }, [destino]);
+
+  function destinatarios() {
+    if(destino === "todos") return embs.filter(function(e){ return e.status === "ativo"; });
+    if(destino === "destaque") return embs.filter(function(e){ return e.nivel === "destaque" || e.nivel === "influenciador"; });
+    if(destino === "selecao") return embs.filter(function(e){ return embSel.includes(e.id); });
+    if(destino === "estreia") return listaEstreia.map(function(c){ return {id:c.id, nome:c.nome, whatsapp:c.telefone, cupom:"", disparos:c.disparos, _estreia:true}; });
+    return [];
+  }
+
+  function buildComponents(tpl, emb) {
+    // Detect how many variables the template body has
+    const body = (tpl.components || []).find(function(c){ return c.type === "BODY"; });
+    if(!body || !body.text) return [];
+    const matches = body.text.match(/{{[0-9]+}}/g) || [];
+    const count = matches.length;
+    if(count === 0) return [];
+
+    // Map variable positions to data
+    // Convention: {{1}} = nome, {{2}} = link painel, {{3}} = cupom
+    const portalUrl = "https://embaixadores.saintgermainbrand.com.br";
+    const params = [
+      emb.nome || "",
+      portalUrl,
+      emb.cupom || "",
+      emb.instagram || "",
+    ];
+
+    const parameters = [];
+    for(let i = 0; i < count; i++) {
+      parameters.push({ type: "text", text: params[i] || "" });
+    }
+    return [{ type: "body", parameters }];
+  }
+
+  async function disparar() {
+    if(!selectedTpl) { alert("Selecione um template."); return; }
+    const lista = destinatarios();
+    if(!lista.length) { alert("Nenhum destinatário selecionado."); return; }
+    if(!confirm("Disparar para " + lista.length + " embaixadores?")) return;
+    setSending(true); setSendLog([]);
+    for(const emb of lista) {
+      const fone = String(emb.whatsapp || "").replace(/[^0-9]/g,"");
+      if(!fone) { setSendLog(function(l){ return [...l, {nome:emb.nome,ok:false,msg:"Sem WhatsApp"}]; }); continue; }
+      try {
+        const res = await fetch(
+          "https://graph.facebook.com/v19.0/" + CONFIG.META_PHONE_ID + "/messages",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + CONFIG.META_TOKEN },
+            body: JSON.stringify({
+              messaging_product: "whatsapp",
+              to: fone.startsWith("55") ? fone : "55" + fone,
+              type: "template",
+              template: {
+                name: selectedTpl.name,
+                language: { code: selectedTpl.language },
+                components: buildComponents(selectedTpl, emb)
+              }
+            })
+          }
+        );
+        const data = await res.json();
+        if(data.error) throw new Error(data.error.message);
+        setSendLog(function(l){ return [...l, {nome:emb.nome,ok:true,msg:"Enviado"}]; });
+        if(emb._estreia) {
+          await supabase.from("pre_estreia").update({disparos: (emb.disparos||0)+1}).eq("id", emb.id);
+        }
+      } catch(e) {
+        setSendLog(function(l){ return [...l, {nome:emb.nome,ok:false,msg:e.message}]; });
+      }
+      await new Promise(function(r){ setTimeout(r, 200); }); // rate limit
+    }
+    setSending(false);
+  }
+
+  return (
+    <div className="fade-in" style={{maxWidth:640}}>
+      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",color:T.g400,textTransform:"uppercase",marginBottom:4}}>WhatsApp Business API</p>
+      <h2 style={{fontFamily:T.serif,fontSize:32,fontWeight:300,marginBottom:32}}>Disparos</h2>
+
+      {/* -- DISPARO MANUAL -- */}
+      <div style={{marginBottom:48}}>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",fontWeight:600,marginBottom:20}}>Disparo Manual</p>
+
+        {/* Templates */}
+        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:T.g400,textTransform:"uppercase",marginBottom:8}}>Template aprovado</p>
+        {loadingTpl && <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Carregando templates...</p>}
+        {tplError && <p style={{fontFamily:T.sans,fontSize:13,color:"#c00"}}>{tplError}</p>}
+        {!loadingTpl && !tplError && (
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+            {templates.length === 0 && <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhum template aprovado encontrado.</p>}
+            {templates.map(function(t) {
+              const sel = selectedTpl?.name === t.name;
+              return (
+                <div key={t.name} onClick={function(){ setSelectedTpl(t); }}
+                  style={{border:"1px solid " + (sel ? T.black : T.g200),padding:"12px 16px",cursor:"pointer",borderRadius:2,background:sel?T.black:T.white}}>
+                  <p style={{fontFamily:T.sans,fontSize:12,fontWeight:600,color:sel?T.white:T.black,marginBottom:4}}>{t.name}</p>
+                  <p style={{fontFamily:T.sans,fontSize:11,color:sel?"#ccc":T.g400,lineHeight:1.5}}>{tplPreview(t).substring(0,120)}{tplPreview(t).length>120?"...":""}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Destinatários */}
+        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",color:T.g400,textTransform:"uppercase",marginBottom:8}}>Destinatários</p>
+        <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {[["todos","Todos ativos"],["destaque","Destaque e Influenciadores"],["estreia","Pré-estreia"],["selecao","Seleção manual"]].map(function([v,l]){
+            return (
+              <button key={v} onClick={function(){ setDestino(v); }}
+                style={{fontFamily:T.sans,fontSize:11,padding:"8px 16px",border:"1px solid "+(destino===v?T.black:T.g200),background:destino===v?T.black:T.white,color:destino===v?T.white:T.black,cursor:"pointer",letterSpacing:"0.08em",textTransform:"uppercase"}}>
+                {l}
+              </button>
+            );
+          })}
+        </div>
+
+        {destino === "selecao" && (
+          <div style={{border:"1px solid "+T.g200,padding:16,marginBottom:16,maxHeight:200,overflowY:"auto"}}>
+            {embs.filter(function(e){ return e.status==="ativo"; }).map(function(e){
+              const checked = embSel.includes(e.id);
+              return (
+                <div key={e.id} onClick={function(){ setEmbSel(function(s){ return checked?s.filter(function(x){return x!==e.id;}):[...s,e.id]; }); }}
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",cursor:"pointer",borderBottom:"1px solid "+T.g200}}>
+                  <div style={{width:16,height:16,border:"1px solid "+(checked?T.black:T.g300),background:checked?T.black:"transparent",flexShrink:0}}/>
+                  <span style={{fontFamily:T.sans,fontSize:12}}>{e.nome}</span>
+                  <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:"auto"}}>{e.cupom}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{marginBottom:24}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <button onClick={disparar} disabled={sending}
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 28px",background:sending?T.g200:T.black,color:T.white,border:"none",cursor:sending?"not-allowed":"pointer"}}>
+              {sending ? "Enviando..." : "Disparar agora"}
+            </button>
+            <button onClick={function(){ setAgendando(!agendando); setAgendado(null); }}
+              style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 28px",background:"transparent",color:T.black,border:"1px solid "+T.black,cursor:"pointer"}}>
+              Agendar
+            </button>
+            <span style={{fontFamily:T.sans,fontSize:12,color:T.g400}}>
+              {destinatarios().length} destinatario{destinatarios().length!==1?"s":""}
+            </span>
+          </div>
+
+          {agendando && (
+            <div style={{border:"1px solid "+T.g200,padding:20,marginBottom:16}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:16}}>Agendar disparo</p>
+              <div style={{display:"flex",gap:16,alignItems:"flex-end",flexWrap:"wrap"}}>
+                <div>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>Data</p>
+                  <input type="date"
+                    min={new Date().toISOString().split("T")[0]}
+                    value={agendado ? agendado.date : ""}
+                    onChange={function(e){ setAgendado(function(p){ return {...(p||{}), date:e.target.value}; }); }}
+                    style={{fontFamily:T.sans,fontSize:13,padding:"10px 12px",border:"1px solid "+T.g200,background:T.white,cursor:"pointer"}}/>
+                </div>
+                <div>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>Horario</p>
+                  <input type="time"
+                    value={agendado ? agendado.time : ""}
+                    onChange={function(e){ setAgendado(function(p){ return {...(p||{}), time:e.target.value}; }); }}
+                    style={{fontFamily:T.sans,fontSize:13,padding:"10px 12px",border:"1px solid "+T.g200,background:T.white,cursor:"pointer"}}/>
+                </div>
+                <button onClick={salvarAgendamento}
+                  style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",padding:"10px 20px",background:T.black,color:T.white,border:"none",cursor:"pointer"}}>
+                  Confirmar agendamento
+                </button>
+                <button onClick={function(){ setAgendando(false); setAgendado(null); }}
+                  style={{fontFamily:T.sans,fontSize:11,color:T.g400,background:"transparent",border:"none",cursor:"pointer"}}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {agendamentos.length > 0 && (
+            <div style={{border:"1px solid "+T.g200,padding:20}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:12}}>Agendamentos pendentes</p>
+              {agendamentos.map(function(a){
+                return (
+                  <div key={a.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid "+T.g200}}>
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:13}}>{new Date(a.datetime).toLocaleString("pt-BR")}</p>
+                      <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>Template: {a.template} - {a.total} destinatario{a.total!==1?"s":""}</p>
+                    </div>
+                    <button onClick={function(){ cancelarAgendamento(a.id); }}
+                      style={{fontFamily:T.sans,fontSize:11,color:"#c00",background:"transparent",border:"none",cursor:"pointer"}}>
+                      Cancelar
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Log */}
+        {sendLog.length > 0 && (
+          <div style={{border:"1px solid "+T.g200,padding:16,maxHeight:200,overflowY:"auto"}}>
+            {sendLog.map(function(l,i){
+              return (
+                <div key={i} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:"1px solid "+T.g200,fontFamily:T.sans,fontSize:12}}>
+                  <span style={{color:l.ok?"#2a7a2a":"#c00",fontWeight:600}}>{l.ok?"✓":"✗"}</span>
+                  <span style={{flex:1}}>{l.nome}</span>
+                  <span style={{color:T.g400}}>{l.msg}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* -- AUTOMAÇÕES -- */}
+      <div style={{borderTop:"1px solid "+T.g200,paddingTop:32}}>
+        <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.12em",textTransform:"uppercase",fontWeight:600,marginBottom:20}}>Automações</p>
+        <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,marginBottom:24,lineHeight:1.6}}>Configure qual template é enviado automaticamente em cada evento. As mensagens são disparadas via Edge Function do Supabase.</p>
+
+        {Object.keys(automacoes).map(function(key) {
+          const auto = automacoes[key];
+          return (
+            <div key={key} style={{borderBottom:"1px solid "+T.g200,padding:"20px 0"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                <p style={{fontFamily:T.sans,fontSize:13,fontWeight:600}}>{autoLabels[key]}</p>
+                <div onClick={function(){ setAutomacoes(function(a){ return {...a,[key]:{...a[key],ativo:!a[key].ativo}}; }); }}
+                  style={{width:40,height:22,background:auto.ativo?T.black:T.g200,borderRadius:11,cursor:"pointer",position:"relative",transition:"background 0.2s"}}>
+                  <div style={{position:"absolute",top:3,left:auto.ativo?20:3,width:16,height:16,background:T.white,borderRadius:"50%",transition:"left 0.2s"}}/>
+                </div>
+              </div>
+              {auto.ativo && (
+                <select value={auto.template} onChange={function(e){ const v=e.target.value; setAutomacoes(function(a){ return {...a,[key]:{...a[key],template:v}}; }); }}
+                  style={{fontFamily:T.sans,fontSize:12,padding:"8px 12px",border:"1px solid "+T.g200,background:T.white,width:"100%",color:auto.template?T.black:T.g400}}>
+                  <option value="">Selecionar template...</option>
+                  {templates.map(function(t){ return <option key={t.name} value={t.name}>{t.name}</option>; })}
+                </select>
+              )}
+            </div>
+          );
+        })}
+
+        <div style={{display:"flex",alignItems:"center",gap:16,marginTop:24}}>
+          <button onClick={salvarAutomacoes} disabled={savingAuto}
+            style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 32px",background:savingAuto?T.g200:T.black,color:T.white,border:"none",cursor:"pointer"}}>
+            {savingAuto ? "Salvando..." : "Salvar automações"}
+          </button>
+          {msgAuto && <p style={{fontFamily:T.sans,fontSize:13,color:"#2a7a2a"}}>{msgAuto}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 
 // ============================================================
