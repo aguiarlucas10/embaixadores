@@ -173,7 +173,7 @@ function Header({ user, onLogout, isAdmin=false }) {
       <Logo/>
       <div style={{display:"flex",alignItems:"center",gap:20}}>
         {isAdmin && <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",border:`1px solid ${T.black}`,padding:"3px 8px"}}>Admin</span>}
-        {isAdmin && <a href="index-sg.html" target="_blank" style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",border:`1px solid ${T.g300}`,padding:"3px 10px",color:T.g500,textDecoration:"none",transition:"all 0.15s"}} title="Abrir portal Embaixadoras SG">Portal SG</a>}
+        {isAdmin && <a href="index-sg.html" target="_blank" style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",border:`1px solid ${T.g300}`,padding:"3px 10px",color:T.g500,textDecoration:"none",transition:"all 0.15s"}}>Embaixadoras SG</a>}
         {user && <button className="sg-btn-ghost" onClick={onLogout} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:"none",cursor:"pointer",color:T.g400,transition:"color 0.15s"}}>Sair</button>}
       </div>
     </header>
