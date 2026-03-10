@@ -1470,35 +1470,62 @@ function PageAdmin({ user, onLogout }) {
   React.useEffect(()=>{ loadDashboard(dashPeriodo); },[dashPeriodo]);
 
   async function loadDashboard(dias) {
-    const desde = new Date(Date.now() - dias*86400000).toISOString();
+    // Datas em horario de Brasilia (UTC-3)
+    function toBRDate(dateStr) {
+      // Recebe ISO string do Supabase (UTC), converte para data local BR
+      const d = new Date(dateStr);
+      // Ajusta para UTC-3
+      const br = new Date(d.getTime() - 3*60*60*1000);
+      return br.toISOString().slice(0,10); // YYYY-MM-DD no fuso BR
+    }
+    function todayBR() {
+      const d = new Date();
+      const br = new Date(d.getTime() - 3*60*60*1000);
+      return br.toISOString().slice(0,10);
+    }
+    function daysAgoBR(n) {
+      const d = new Date();
+      const br = new Date(d.getTime() - 3*60*60*1000 - n*86400000);
+      return br.toISOString().slice(0,10); // YYYY-MM-DD
+    }
+    function keyToLabel(k) {
+      // YYYY-MM-DD -> DD/MM
+      return k.slice(8,10)+"/"+k.slice(5,7);
+    }
+    function keyToMonthLabel(k) {
+      // YYYY-MM -> MM/YY
+      return k.slice(5,7)+"/"+k.slice(2,4);
+    }
+
+    const desde = daysAgoBR(dias)+"T00:00:00-03:00";
 
     const {data:coms}     = await supabase.from("comissoes").select("embaixador_id,valor_pedido,valor_comissao,status,payment_status,criado_em").gte("criado_em",desde).order("criado_em",{ascending:true});
     const {data:todosEmbs}= await supabase.from("embaixadores").select("id,nome,status,criado_em");
     const {data:resgAll}  = await supabase.from("resgates").select("valor,status,criado_em").order("criado_em",{ascending:true});
     const {data:views}    = await supabase.from("page_views").select("criado_em,dispositivo,sistema_operacional,navegador,utm_source,utm_medium,utm_campaign,etapa_saida,tempo_segundos").gte("criado_em",desde);
 
-    // Init buckets per day
+    // Init buckets per day em fuso BR
     const fatDiario = {};
     const cadDiario = {};
     for(let d=0;d<dias;d++){
-      const dt  = new Date(Date.now()-(dias-1-d)*86400000);
-      const key = dt.toISOString().slice(0,10);
+      const key = daysAgoBR(dias-1-d);
       fatDiario[key] = {faturamento:0, comissao:0};
       cadDiario[key] = {cadastros:0, visitas:0};
     }
     (coms||[]).forEach(c=>{
-      const k = c.criado_em.slice(0,10);
+      const k = toBRDate(c.criado_em);
       if(fatDiario[k]){ fatDiario[k].faturamento+=c.valor_pedido||0; fatDiario[k].comissao+=c.valor_comissao||0; }
     });
     (todosEmbs||[]).filter(e=>e.criado_em>=desde).forEach(e=>{
-      const k=e.criado_em.slice(0,10); if(cadDiario[k]) cadDiario[k].cadastros+=1;
+      const k=toBRDate(e.criado_em); if(cadDiario[k]) cadDiario[k].cadastros+=1;
     });
     (views||[]).forEach(v=>{
-      const k=v.criado_em.slice(0,10); if(cadDiario[k]) cadDiario[k].visitas+=1;
+      const k=toBRDate(v.criado_em); if(cadDiario[k]) cadDiario[k].visitas+=1;
     });
 
     const timeline = Object.keys(fatDiario).sort().map(k=>({
-      data:      k.slice(5),
+      data:      keyToLabel(k),    // DD/MM
+      dataISO:   k,
       fat:       Math.round(fatDiario[k].faturamento*100)/100,
       comissao:  Math.round(fatDiario[k].comissao*100)/100,
       cadastros: cadDiario[k]?.cadastros||0,
@@ -1513,7 +1540,8 @@ function PageAdmin({ user, onLogout }) {
     const ativas       = (todosEmbs||[]).filter(e=>e.status==="ativo").length;
     const comVenda     = new Set(pagos.map(c=>c.embaixador_id).filter(Boolean)).size;
     const visitasTotal = (views||[]).length;
-    const cadPeriodo   = (todosEmbs||[]).filter(e=>e.criado_em>=desde).length;
+    const desdeISO = daysAgoBR(dias); // YYYY-MM-DD para comparar com toBRDate
+    const cadPeriodo   = (todosEmbs||[]).filter(e=>toBRDate(e.criado_em)>=desdeISO).length;
     const txConversao  = visitasTotal>0?Math.round((cadPeriodo/visitasTotal)*100):0;
 
     const funil = [
@@ -1538,8 +1566,8 @@ function PageAdmin({ user, onLogout }) {
 
     const resgMap={};
     (resgAll||[]).forEach(r=>{
-      const k=r.criado_em.slice(0,7);
-      if(!resgMap[k]) resgMap[k]={mes:k,valor:0,qtd:0};
+      const k=toBRDate(r.criado_em).slice(0,7); // YYYY-MM em fuso BR
+      if(!resgMap[k]) resgMap[k]={mes:keyToMonthLabel(k),valor:0,qtd:0};
       resgMap[k].valor+=r.valor||0; resgMap[k].qtd+=1;
     });
     const resgPorMes=Object.values(resgMap).sort((a,b)=>a.mes.localeCompare(b.mes)).slice(-6);
