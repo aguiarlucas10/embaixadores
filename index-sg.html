@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Embaixadoras SG — Saint Germain</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Questrial&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Questrial',sans-serif;background:#fff;color:#000}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .fade-in{animation:fadeIn 0.25s ease both}
+    input[type=date]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:0.5}
+    textarea{font-family:inherit}
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#e0e0e0;border-radius:2px}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+// ============================================================
+// CONFIG
+// ============================================================
+const CONFIG = {
+  SUPABASE_URL:      "https://fsfqnshkfwnfeswwdmxg.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnFuc2hrZnduZmVzd3dkbXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MzcxNDAsImV4cCI6MjA4ODMxMzE0MH0.XO5JpNdnu03tRLGUsisi3I_lTZHcMwhJMlw9VBrXkK8",
+  NUVEMSHOP_USER_ID: "1116055",
+  NUVEMSHOP_TOKEN:   "803dbce287de76eb31d88c26c30e60c72126bb22",
+  COMISSAO_PCT:      0.10,
+  DESCONTO_PCT:      0.10,
+  ADMIN_EMAILS:      ["adminsg@saintgermain.com.br"],
+};
+
+const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
+const NS = {
+  proxy: `${CONFIG.SUPABASE_URL}/functions/v1/bright-api`,
+  h: { "Content-Type":"application/json", "Authorization":`Bearer ${CONFIG.SUPABASE_ANON_KEY}` },
+  async ordersByCoupon(code) {
+    try { const r = await fetch(`${this.proxy}?action=orders_by_coupon&coupon=${encodeURIComponent(code)}`,{headers:this.h}); return r.ok?r.json():[]; } catch{return[];}
+  },
+};
+
+// ============================================================
+// HELPERS
+// ============================================================
+const brl = v => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v||0);
+const fmt = s => s ? new Date(s).toLocaleDateString("pt-BR") : "-";
+function toBRDate(s){ const d=new Date(s),br=new Date(d.getTime()-3*60*60*1000); return br.toISOString().slice(0,10); }
+function daysAgoBR(n){ const d=new Date(),br=new Date(d.getTime()-3*60*60*1000-n*86400000); return br.toISOString().slice(0,10); }
+function keyToLabel(k){ return k.slice(8,10)+"/"+k.slice(5,7); }
+function keyToMonthLabel(k){ return k.slice(5,7)+"/"+k.slice(2,4); }
+
+// ============================================================
+// DESIGN TOKENS
+// ============================================================
+const T = {
+  serif:"'Cormorant Garamond',serif", sans:"'Questrial',sans-serif",
+  black:"#000", white:"#fff",
+  g100:"#f5f5f5", g200:"#e8e8e8", g300:"#d0d0d0",
+  g400:"#a0a0a0", g500:"#707070", g600:"#404040",
+};
+
+// ============================================================
+// ATOMS
+// ============================================================
+function Spinner(){ return <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:80}}><span style={{width:20,height:20,border:"2px solid #eee",borderTopColor:"#000",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/></div>; }
+
+function Logo(){ return (
+  <div>
+    <div style={{fontFamily:T.sans,fontSize:13,letterSpacing:"0.25em",textTransform:"uppercase"}}>Saint Germain</div>
+    <div style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginTop:1}}>Embaixadoras SG</div>
+  </div>
+);}
+
+function Header({user,onLogout,isAdmin=false}){ return (
+  <header style={{borderBottom:`1px solid ${T.black}`,padding:"0 32px",height:64,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,background:T.white,zIndex:100}}>
+    <Logo/>
+    <div style={{display:"flex",alignItems:"center",gap:20}}>
+      {isAdmin && <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",border:`1px solid ${T.black}`,padding:"3px 8px"}}>Admin SG</span>}
+      {user && <button onClick={onLogout} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:"none",cursor:"pointer",color:T.g400}}>Sair</button>}
+    </div>
+  </header>
+);}
+
+function Input({label,value,onChange,type="text",placeholder="",style:sx={}}){ return (
+  <div style={{display:"flex",flexDirection:"column",gap:6,...sx}}>
+    {label&&<label style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g600}}>{label}</label>}
+    <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+      style={{fontFamily:T.sans,fontSize:15,border:"none",borderBottom:`1px solid ${T.black}`,padding:"10px 0",outline:"none",background:"transparent",color:T.black,width:"100%"}}/>
+  </div>
+);}
+
+function BtnPrimary({children,onClick,loading,style:sx={}}){ return (
+  <button onClick={onClick} disabled={loading}
+    style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.2em",textTransform:"uppercase",background:T.black,color:T.white,border:"none",padding:"16px 32px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,...sx}}>
+    {loading?<span style={{width:14,height:14,border:"1.5px solid #fff",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>:children}
+  </button>
+);}
+
+function BtnSecondary({children,onClick,style:sx={}}){ return (
+  <button onClick={onClick}
+    style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:`1px solid ${T.g300}`,padding:"12px 24px",cursor:"pointer",color:T.g600,...sx}}>
+    {children}
+  </button>
+);}
+
+function Alert({msg,ok}){ return (
+  <div style={{padding:"12px 16px",background:ok?"#f0faf4":"#fff5f5",border:`1px solid ${ok?"#b8e8c8":"#fbc8c8"}`,fontFamily:T.sans,fontSize:12,color:ok?"#2a7a4a":"#c00"}}>
+    {msg}
+  </div>
+);}
+
+function Badge({text,color=T.g400}){ return (
+  <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",border:`1px solid ${color}`,color,padding:"2px 8px",whiteSpace:"nowrap"}}>
+    {text}
+  </span>
+);}
+
+function StatGrid({items,cols=4}){ return (
+  <div style={{display:"grid",gridTemplateColumns:`repeat(${cols},1fr)`,gap:1,background:T.g200,border:`1px solid ${T.g200}`,marginBottom:40}}>
+    {items.map(([val,label],i)=>(
+      <div key={i} style={{padding:"20px 24px",background:T.white}}>
+        <p style={{fontFamily:T.serif,fontSize:32,fontWeight:300,marginBottom:4}}>{val}</p>
+        <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",color:T.g400}}>{label}</p>
+      </div>
+    ))}
+  </div>
+);}
+
+function Tabs({tabs,labels,active,onChange,children}){
+  const [open,setOpen]=React.useState(false);
+  return(
+    <div style={{display:"flex",minHeight:"calc(100vh - 64px)"}}>
+      <nav style={{width:56,borderRight:`1px solid ${T.g200}`,flexShrink:0,position:"sticky",top:64,height:"calc(100vh - 64px)",display:"flex",flexDirection:"column",alignItems:"center",paddingTop:16,gap:0,overflowY:"auto"}}>
+        <button onClick={()=>setOpen(o=>!o)} style={{background:"none",border:"none",cursor:"pointer",padding:"12px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:4,marginBottom:8}}>
+          <span style={{fontFamily:T.sans,fontSize:7,letterSpacing:"0.12em",textTransform:"uppercase",color:T.g400}}>menu</span>
+          {[0,1,2].map(i=><span key={i} style={{display:"block",width:16,height:2,background:T.black}}/>)}
+        </button>
+        {open && (
+          <div style={{position:"absolute",left:56,top:0,background:T.white,border:`1px solid ${T.g200}`,zIndex:200,minWidth:180,boxShadow:"2px 2px 12px rgba(0,0,0,0.06)"}}>
+            {tabs.map(t=>(
+              <button key={t} onClick={()=>{onChange(t);setOpen(false);}}
+                style={{display:"block",width:"100%",textAlign:"left",fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",padding:"14px 20px",background:active===t?T.black:"transparent",color:active===t?T.white:T.black,border:"none",borderBottom:`1px solid ${T.g100}`,cursor:"pointer"}}>
+                {labels[t]||t}
+              </button>
+            ))}
+          </div>
+        )}
+        {tabs.map(t=>(
+          <button key={t} onClick={()=>onChange(t)} title={labels[t]||t}
+            style={{writingMode:"vertical-rl",textOrientation:"mixed",fontFamily:T.sans,fontSize:8,letterSpacing:"0.18em",textTransform:"uppercase",background:"none",border:"none",cursor:"pointer",padding:"16px 0",color:active===t?T.black:T.g400,borderLeft:active===t?`2px solid ${T.black}`:"2px solid transparent",transition:"all 0.15s",whiteSpace:"nowrap"}}>
+            {labels[t]||t}
+          </button>
+        ))}
+      </nav>
+      <div style={{flex:1,padding:"40px 48px",maxWidth:1100,overflowX:"hidden"}}>{children}</div>
+    </div>
+  );
+}
+
+// ============================================================
+// CHART HELPERS (same as main portal)
+// ============================================================
+function niceMax(val){ if(val===0)return 10; const mag=Math.pow(10,Math.floor(Math.log10(val))),norm=val/mag; return (norm<=1?1:norm<=2?2:norm<=5?5:10)*mag; }
+function yTicks(max,count=4){ const step=max/count; return Array.from({length:count+1},(_,i)=>i*step); }
+function fmtY(v,isCurrency){ if(!isCurrency)return v>=1000?(v/1000).toFixed(1)+"k":String(Math.round(v)); if(v===0)return"0"; if(v>=1000)return"R$"+(v/1000).toFixed(v>=10000?0:1)+"k"; return"R$"+Math.round(v); }
+
+function BarChartSVG({data,valueKey,labelKey,isCurrency=false,secondKey,secondLabel}){
+  const [tt,setTt]=React.useState(null);
+  if(!data||data.length===0)return<div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${T.g100}`}}><p style={{fontFamily:T.sans,fontSize:12,color:"#bbb",letterSpacing:"0.1em"}}>SEM DADOS NO PERIODO</p></div>;
+  const PAD={top:12,right:12,bottom:36,left:52},VW=700,VH=220,CW=VW-PAD.left-PAD.right,CH=VH-PAD.top-PAD.bottom;
+  const rawMax=Math.max(...data.map(d=>(d[valueKey]||0)+(secondKey?(d[secondKey]||0):0)),1);
+  const maxV=niceMax(rawMax),ticks=yTicks(maxV,4);
+  const barSlot=CW/data.length,barPad=Math.max(barSlot*0.2,2),bw=barSlot-barPad*2;
+  const every=Math.max(1,Math.ceil(data.length/Math.floor(CW/48)));
+  const yOf=v=>CH-(v/maxV)*CH;
+  return(
+    <div style={{position:"relative",userSelect:"none"}}>
+      <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{display:"block",overflow:"visible"}}>
+        <g transform={`translate(${PAD.left},${PAD.top})`}>
+          {ticks.map(t=><g key={t}><line x1={0} y1={yOf(t)} x2={CW} y2={yOf(t)} stroke={t===0?"#ddd":"#f2f2f2"} strokeWidth="1"/><text x={-8} y={yOf(t)+4} textAnchor="end" fontSize="11" fill="#bbb" fontFamily="sans-serif">{fmtY(t,isCurrency)}</text></g>)}
+          {data.map((d,i)=>{
+            const v1=d[valueKey]||0,v2=secondKey?(d[secondKey]||0):0;
+            const x0=i*barSlot+barPad,bw1=secondKey?bw/2-1:bw;
+            const h1=Math.max((v1/maxV)*CH,v1>0?1:0),h2=Math.max((v2/maxV)*CH,v2>0?1:0);
+            const lastS=Math.floor((data.length-1)/every)*every,tooClose=(data.length-1-lastS)<Math.ceil(every*0.5);
+            const showLbl=(i%every===0)||(i===data.length-1&&!tooClose);
+            return(<g key={i} onMouseEnter={()=>setTt({i,x:x0+bw/2,v1,v2,label:d[labelKey]})} onMouseLeave={()=>setTt(null)}>
+              <rect x={x0} y={yOf(v1)} width={bw1} height={h1} fill="#111" opacity={tt&&tt.i===i?1:0.85}/>
+              {secondKey&&<rect x={x0+bw/2+1} y={yOf(v2)} width={bw1} height={h2} fill="#ccc" opacity={tt&&tt.i===i?1:0.85}/>}
+              {showLbl&&<text x={x0+bw/2} y={CH+24} textAnchor="middle" fontSize="10" fill="#bbb" fontFamily="sans-serif">{d[labelKey]}</text>}
+            </g>);
+          })}
+          <line x1={0} y1={CH} x2={CW} y2={CH} stroke="#e0e0e0" strokeWidth="1"/>
+        </g>
+      </svg>
+      {tt&&<div style={{position:"absolute",top:8,left:`${(PAD.left+tt.x)/VW*100}%`,transform:"translateX(-50%)",background:"#111",color:"#fff",fontFamily:T.sans,fontSize:11,padding:"8px 12px",pointerEvents:"none",whiteSpace:"nowrap",zIndex:10,lineHeight:1.7}}>
+        <div style={{color:"#888",fontSize:10,marginBottom:2}}>{tt.label}</div>
+        <div>{isCurrency?"R$ "+tt.v1.toLocaleString("pt-BR",{minimumFractionDigits:2}):tt.v1}</div>
+        {secondKey&&<div style={{color:"#ccc"}}>{secondLabel}: {isCurrency?"R$ "+tt.v2.toLocaleString("pt-BR",{minimumFractionDigits:2}):tt.v2}</div>}
+      </div>}
+    </div>
+  );
+}
+
+function ComboChartSVG({data,barKey,barLabel,lineKey,lineLabel,labelKey}){
+  const [tt,setTt]=React.useState(null);
+  if(!data||data.length===0)return<div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${T.g100}`}}><p style={{fontFamily:T.sans,fontSize:12,color:"#bbb",letterSpacing:"0.1em"}}>SEM DADOS NO PERIODO</p></div>;
+  const PAD={top:12,right:12,bottom:36,left:52},VW=700,VH=220,CW=VW-PAD.left-PAD.right,CH=VH-PAD.top-PAD.bottom;
+  const rawMax=Math.max(...data.map(d=>Math.max(d[barKey]||0,d[lineKey]||0)),1);
+  const maxV=niceMax(rawMax),ticks=yTicks(maxV,4),yOf=v=>CH-(v/maxV)*CH;
+  const barSlot=CW/data.length,barPad=Math.max(barSlot*0.22,2),bw=barSlot-barPad*2;
+  const xC=i=>i*barSlot+barSlot/2;
+  const pathD=data.map((d,i)=>`${i===0?"M":"L"}${xC(i)},${yOf(d[lineKey]||0)}`).join(" ");
+  const areaD=pathD+` L${xC(data.length-1)},${CH} L${xC(0)},${CH} Z`;
+  const every=Math.max(1,Math.ceil(data.length/Math.floor(CW/48)));
+  return(
+    <div style={{position:"relative",userSelect:"none"}}>
+      <div style={{display:"flex",gap:20,marginBottom:10,paddingLeft:52}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:10,background:"#111",display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:"#999"}}>{barLabel}</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:18,height:2,background:"#bbb",display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:"#999"}}>{lineLabel}</span></div>
+      </div>
+      <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{display:"block",overflow:"visible"}}
+        onMouseMove={e=>{const r=e.currentTarget.getBoundingClientRect(),mx=(e.clientX-r.left)/r.width*VW-PAD.left;setTt({i:Math.max(0,Math.min(data.length-1,Math.floor(mx/barSlot)))});}}
+        onMouseLeave={()=>setTt(null)}>
+        <g transform={`translate(${PAD.left},${PAD.top})`}>
+          {ticks.map(t=><g key={t}><line x1={0} y1={yOf(t)} x2={CW} y2={yOf(t)} stroke={t===0?"#ddd":"#f2f2f2"} strokeWidth="1"/><text x={-8} y={yOf(t)+4} textAnchor="end" fontSize="11" fill="#bbb" fontFamily="sans-serif">{fmtY(t,false)}</text></g>)}
+          {data.map((d,i)=>{ const v=d[barKey]||0,h=Math.max((v/maxV)*CH,v>0?1:0),x0=i*barSlot+barPad; return<rect key={i} x={x0} y={yOf(v)} width={bw} height={h} fill="#111" opacity={tt&&tt.i===i?1:0.8}/>; })}
+          <path d={areaD} fill="#aaa" opacity="0.08"/>
+          <path d={pathD} fill="none" stroke="#aaa" strokeWidth="2" strokeLinejoin="round"/>
+          {tt&&<><line x1={xC(tt.i)} y1={0} x2={xC(tt.i)} y2={CH} stroke="#eee" strokeWidth="1" strokeDasharray="3,3"/><circle cx={xC(tt.i)} cy={yOf(data[tt.i][lineKey]||0)} r="4" fill="#aaa" stroke="#fff" strokeWidth="2"/><circle cx={xC(tt.i)} cy={yOf(data[tt.i][barKey]||0)} r="4" fill="#111" stroke="#fff" strokeWidth="2"/></>}
+          {data.map((d,i)=>{ const lS=Math.floor((data.length-1)/every)*every,tC=(data.length-1-lS)<Math.ceil(every*0.5),show=(i%every===0)||(i===data.length-1&&!tC); if(!show)return null; return<text key={"xl"+i} x={xC(i)} y={CH+24} textAnchor="middle" fontSize="10" fill="#bbb" fontFamily="sans-serif">{d[labelKey]}</text>; })}
+          <line x1={0} y1={CH} x2={CW} y2={CH} stroke="#e0e0e0" strokeWidth="1"/>
+        </g>
+      </svg>
+      {tt&&<div style={{position:"absolute",top:8,left:`${(PAD.left+xC(tt.i))/VW*100}%`,transform:"translateX(-50%)",background:"#111",color:"#fff",fontFamily:T.sans,fontSize:11,padding:"8px 12px",pointerEvents:"none",whiteSpace:"nowrap",zIndex:10,lineHeight:1.7}}>
+        <div style={{color:"#888",fontSize:10,marginBottom:2}}>{data[tt.i][labelKey]}</div>
+        <div>{barLabel}: <strong>{data[tt.i][barKey]||0}</strong></div>
+        <div style={{color:"#ccc"}}>{lineLabel}: <strong>{data[tt.i][lineKey]||0}</strong></div>
+      </div>}
+    </div>
+  );
+}
+
+
+// ============================================================
+// PAGE LOGIN
+// ============================================================
+function PageLogin({onLogin}){
+  const [email,setEmail]=React.useState("");
+  const [senha,setSenha]=React.useState("");
+  const [loading,setLoading]=React.useState(false);
+  const [err,setErr]=React.useState("");
+  const [modo,setModo]=React.useState("login"); // login | recuperar
+  const [enviado,setEnviado]=React.useState(false);
+  const [loadingRec,setLoadingRec]=React.useState(false);
+
+  async function entrar(){
+    setLoading(true); setErr("");
+    const {data,error}=await supabase.auth.signInWithPassword({email,password:senha});
+    if(error){setErr("E-mail ou senha incorretos.");setLoading(false);return;}
+    onLogin(data.user);
+  }
+
+  async function recuperar(){
+    setLoadingRec(true);
+    await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
+    setEnviado(true); setLoadingRec(false);
+  }
+
+  return(
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      <Header/>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+        <div style={{width:"100%",maxWidth:360}}>
+          {modo==="login"?(
+            <>
+              <h1 style={{fontFamily:T.serif,fontSize:36,fontWeight:300,marginBottom:8}}>Entrar</h1>
+              <p style={{fontFamily:T.sans,fontSize:12,color:T.g400,marginBottom:40}}>Portal Embaixadoras SG</p>
+              <div style={{display:"flex",flexDirection:"column",gap:24}}>
+                <Input label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+                <Input label="Senha" type="password" value={senha} onChange={e=>setSenha(e.target.value)}/>
+              </div>
+              {err&&<div style={{marginTop:16}}><Alert msg={err} ok={false}/></div>}
+              <div style={{marginTop:32}}><BtnPrimary onClick={entrar} loading={loading}>Entrar</BtnPrimary></div>
+              <button onClick={()=>setModo("recuperar")} style={{fontFamily:T.sans,fontSize:11,color:T.g400,background:"none",border:"none",cursor:"pointer",marginTop:20,textDecoration:"underline"}}>Esqueci minha senha</button>
+            </>
+          ):(
+            <>
+              <h1 style={{fontFamily:T.serif,fontSize:36,fontWeight:300,marginBottom:8}}>Recuperar senha</h1>
+              {enviado
+                ? <Alert msg="Enviamos um link para o seu e-mail. Verifique a caixa de entrada." ok={true}/>
+                : (<>
+                  <p style={{fontFamily:T.sans,fontSize:12,color:T.g400,marginBottom:32}}>Digite seu e-mail para receber o link de recuperacao.</p>
+                  <Input label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+                  <div style={{marginTop:24}}><BtnPrimary onClick={recuperar} loading={loadingRec}>Enviar link</BtnPrimary></div>
+                </>)
+              }
+              <button onClick={()=>setModo("login")} style={{fontFamily:T.sans,fontSize:11,color:T.g400,background:"none",border:"none",cursor:"pointer",marginTop:20,textDecoration:"underline"}}>Voltar ao login</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// PAGE PAINEL (embaixadora sg)
+// ============================================================
+function PagePainel({user,onLogout}){
+  const [emb,setEmb]=React.useState(null);
+  const [coms,setComs]=React.useState([]);
+  const [resgates,setResgates]=React.useState([]);
+  const [banner,setBanner]=React.useState(null);
+  const [bannerCaption,setBannerCaption]=React.useState("");
+  const [bannerAltura,setBannerAltura]=React.useState(200);
+  const [loading,setLoading]=React.useState(true);
+  const [sync,setSync]=React.useState(false);
+  const [fResgate,setFResgate]=React.useState({tipo:"pix"});
+  const [solicitando,setSolicitando]=React.useState(false);
+  const [msgRes,setMsgRes]=React.useState({text:"",ok:false});
+  const [editando,setEditando]=React.useState(false);
+  const [fEdit,setFEdit]=React.useState({});
+  const [savingEdit,setSavingEdit]=React.useState(false);
+
+  React.useEffect(()=>{load();},[]);
+
+  async function load(){
+    setLoading(true);
+    const {data:e}=await supabase.from("embaixadores_sg").select("*").eq("email",user.email).maybeSingle();
+    if(e){ setEmb(e);
+      const {data:c}=await supabase.from("comissoes_sg").select("*").eq("embaixador_sg_id",e.id).order("criado_em",{ascending:false});
+      setComs(c||[]);
+      const {data:r}=await supabase.from("resgates_sg").select("*").eq("embaixador_sg_id",e.id).order("criado_em",{ascending:false});
+      setResgates(r||[]);
+    }
+    const {data:b}=await supabase.from("config").select("valor").eq("chave","banner_sg_ativo").maybeSingle();
+    if(b?.valor) setBanner(b.valor);
+    const {data:bc}=await supabase.from("config").select("valor").eq("chave","banner_sg_caption").maybeSingle();
+    if(bc?.valor) setBannerCaption(bc.valor);
+    const {data:ba}=await supabase.from("config").select("valor").eq("chave","banner_sg_altura").maybeSingle();
+    if(ba?.valor) setBannerAltura(Number(ba.valor));
+    setLoading(false);
+  }
+
+  async function sincronizar(){
+    if(!emb) return; setSync(true);
+    const pedidos=await NS.ordersByCoupon(emb.cupom);
+    let novos=0;
+    for(const p of (pedidos||[])){
+      if(!p.coupon) continue;
+      const match=(p.coupon||[]).find(c=>(c.code||"").toUpperCase()===(emb.cupom||"").toUpperCase());
+      if(!match) continue;
+      const {data:existe}=await supabase.from("comissoes_sg").select("id").eq("pedido_id",String(p.id)).eq("embaixador_sg_id",emb.id).maybeSingle();
+      if(existe) continue;
+      const val=parseFloat(p.total)||0;
+      const status=p.payment_status==="paid"||p.payment_status==="authorized"?"confirmada":"pendente";
+      await supabase.from("comissoes_sg").insert({embaixador_sg_id:emb.id,pedido_id:String(p.id),valor_pedido:val,valor_comissao:val*CONFIG.COMISSAO_PCT,status,payment_status:p.payment_status,resgatada:false,criado_em:p.created_at});
+      novos++;
+    }
+    await load(); setSync(false);
+  }
+
+  async function salvarPerfil(){
+    setSavingEdit(true);
+    await supabase.from("embaixadores_sg").update({whatsapp:fEdit.whatsapp,instagram:fEdit.instagram,pix_key:fEdit.pix_key}).eq("id",emb.id);
+    setSavingEdit(false); setEditando(false); await load();
+  }
+
+  if(loading) return <div style={{minHeight:"100vh"}}><Header user={user} onLogout={onLogout}/><Spinner/></div>;
+  if(!emb) return(
+    <div style={{minHeight:"100vh"}}><Header user={user} onLogout={onLogout}/>
+      <div style={{padding:48}}><Alert msg="Conta nao encontrada no programa Embaixadoras SG. Entre em contato com a equipe Saint Germain." ok={false}/></div>
+    </div>
+  );
+
+  const saldoPago=coms.filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
+  const totalGanho=coms.filter(c=>c.status==="confirmada").reduce((s,c)=>s+(c.valor_comissao||0),0);
+  const hoje=new Date().getDate();
+  const podeSolicitar=saldoPago>=100&&hoje<=10&&emb.pix_key;
+
+  async function solicitar(){
+    if(!podeSolicitar) return;
+    setSolicitando(true); setMsgRes({text:"",ok:false});
+    await supabase.from("resgates_sg").insert({embaixador_sg_id:emb.id,valor:saldoPago,tipo:"pix",pix_key:emb.pix_key,status:"solicitado",criado_em:new Date().toISOString()});
+    const ids=coms.filter(c=>c.status==="confirmada"&&!c.resgatada).map(c=>c.id);
+    if(ids.length) await supabase.from("comissoes_sg").update({resgatada:true}).in("id",ids);
+    setMsgRes({text:"Resgate solicitado com sucesso! Pagamento ate o dia 20.",ok:true});
+    setSolicitando(false); await load();
+  }
+
+  return(
+    <div style={{minHeight:"100vh"}}>
+      <Header user={user} onLogout={onLogout}/>
+      {banner&&(
+        <div style={{overflow:"hidden"}}>
+          <img src={banner} alt="Promocao" style={{width:"100%",maxHeight:bannerAltura,objectFit:"cover",display:"block"}}/>
+          {bannerCaption&&<div style={{padding:"12px 16px",background:"#f9f9f9",borderTop:`1px solid ${T.g200}`}}><p style={{fontFamily:T.sans,fontSize:12,color:T.g500,lineHeight:1.7}}>{bannerCaption}</p></div>}
+        </div>
+      )}
+      <div style={{maxWidth:800,margin:"0 auto",padding:"40px 24px"}}>
+        <div style={{marginBottom:40}}>
+          <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:4}}>Ola, {emb.nome.split(" ")[0]}</p>
+          <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300}}>Embaixadora Saint Germain</h2>
+          <p style={{fontFamily:T.sans,fontSize:12,color:T.g400,marginTop:4}}>Cupom: <strong style={{color:T.black,letterSpacing:"0.12em"}}>{emb.cupom}</strong></p>
+        </div>
+
+        <StatGrid items={[[brl(saldoPago),"Disponivel para resgate"],[brl(totalGanho),"Total ganho"],[coms.filter(c=>c.status==="confirmada").length,"Pedidos confirmados"],[coms.length,"Total de pedidos"]]} cols={4}/>
+
+        {/* Resgate */}
+        <div style={{marginBottom:48,padding:24,border:`1px solid ${T.g200}`}}>
+          <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>Solicitar resgate</p>
+          {!emb.pix_key&&<Alert msg="Cadastre sua chave Pix no perfil para solicitar resgate." ok={false}/>}
+          {emb.pix_key&&saldoPago<100&&<p style={{fontFamily:T.sans,fontSize:13,color:T.g400,lineHeight:1.7}}>Saldo minimo para resgate: <strong>R$ 100,00</strong>. Seu saldo atual e {brl(saldoPago)}. Continue vendendo!</p>}
+          {emb.pix_key&&saldoPago>=100&&hoje>10&&<p style={{fontFamily:T.sans,fontSize:13,color:T.g400,lineHeight:1.7}}>Periodo de solicitacao encerrado. Proxima janela: ate o dia 10 do mes que vem.</p>}
+          {podeSolicitar&&(
+            <div>
+              <p style={{fontFamily:T.sans,fontSize:13,lineHeight:1.7,marginBottom:16}}>Valor disponivel: <strong style={{fontFamily:T.serif,fontSize:20}}>{brl(saldoPago)}</strong></p>
+              <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:20}}>Pix: {emb.pix_key} &mdash; Pagamento ate o dia 20.</p>
+              <BtnPrimary onClick={solicitar} loading={solicitando} style={{width:"auto",padding:"12px 32px"}}>Solicitar resgate</BtnPrimary>
+            </div>
+          )}
+          {msgRes.text&&<div style={{marginTop:16}}><Alert msg={msgRes.text} ok={msgRes.ok}/></div>}
+        </div>
+
+        {/* Historico comissoes */}
+        <div style={{marginBottom:48}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase"}}>Historico de vendas</p>
+            <button onClick={sincronizar} disabled={sync} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",background:"none",border:`1px solid ${T.g200}`,padding:"8px 14px",cursor:"pointer",color:T.g500}}>
+              {sync?"Sincronizando...":"Sincronizar"}
+            </button>
+          </div>
+          {coms.length===0
+            ? <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhuma venda registrada ainda.</p>
+            : <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontFamily:T.sans}}>
+              <thead><tr style={{borderBottom:`2px solid ${T.black}`}}>
+                {["Data","Pedido","Valor","Comissao","Status"].map(h=><th key={h} style={{fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",color:T.g400,fontWeight:400,padding:"8px 12px",textAlign:"left"}}>{h}</th>)}
+              </tr></thead>
+              <tbody>{coms.map((c,i)=>(
+                <tr key={c.id} style={{borderBottom:`1px solid ${T.g100}`,background:i%2===0?"transparent":"#fafafa"}}>
+                  <td style={{padding:"10px 12px",fontSize:12,color:T.g500}}>{fmt(c.criado_em)}</td>
+                  <td style={{padding:"10px 12px",fontSize:12,color:T.g500}}>#{c.pedido_id}</td>
+                  <td style={{padding:"10px 12px",fontSize:13}}>{brl(c.valor_pedido)}</td>
+                  <td style={{padding:"10px 12px",fontFamily:T.serif,fontSize:16,fontWeight:300,color:"#2a9d5c"}}>{brl(c.valor_comissao)}</td>
+                  <td style={{padding:"10px 12px"}}><Badge text={c.status} color={c.status==="confirmada"?"#2a9d5c":T.g400}/></td>
+                </tr>
+              ))}</tbody>
+            </table></div>
+          }
+        </div>
+
+        {/* Resgates solicitados */}
+        {resgates.length>0&&(
+          <div style={{marginBottom:48}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>Resgates solicitados</p>
+            {resgates.map(r=>(
+              <div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:`1px solid ${T.g100}`}}>
+                <div><p style={{fontFamily:T.sans,fontSize:12,color:T.g500}}>{fmt(r.criado_em)}</p><p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>Pix: {r.pix_key}</p></div>
+                <div style={{textAlign:"right"}}><p style={{fontFamily:T.serif,fontSize:20,fontWeight:300,marginBottom:4}}>{brl(r.valor)}</p><Badge text={{solicitado:"Solicitado",aprovado:"Aprovado",pago:"Pago",recusado:"Recusado"}[r.status]||r.status} color={{solicitado:T.g400,aprovado:"#000",pago:"#2a9d5c",recusado:"#c00"}[r.status]}/></div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Perfil */}
+        <div style={{borderTop:`1px solid ${T.g200}`,paddingTop:40}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase"}}>Meu perfil</p>
+            {!editando&&<button onClick={()=>{setFEdit({whatsapp:emb.whatsapp||"",instagram:emb.instagram||"",pix_key:emb.pix_key||""});setEditando(true);}} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",background:"none",border:`1px solid ${T.g200}`,padding:"8px 14px",cursor:"pointer"}}>Editar</button>}
+          </div>
+          {editando?(
+            <div style={{display:"flex",flexDirection:"column",gap:20}}>
+              <Input label="WhatsApp" value={fEdit.whatsapp} onChange={e=>setFEdit(p=>({...p,whatsapp:e.target.value}))}/>
+              <Input label="Instagram" value={fEdit.instagram} onChange={e=>setFEdit(p=>({...p,instagram:e.target.value}))}/>
+              <Input label="Chave Pix" value={fEdit.pix_key} onChange={e=>setFEdit(p=>({...p,pix_key:e.target.value}))}/>
+              <div style={{display:"flex",gap:12}}>
+                <BtnPrimary onClick={salvarPerfil} loading={savingEdit} style={{width:"auto",padding:"12px 28px"}}>Salvar</BtnPrimary>
+                <BtnSecondary onClick={()=>setEditando(false)}>Cancelar</BtnSecondary>
+              </div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {[["Nome",emb.nome],["E-mail",emb.email],["WhatsApp",emb.whatsapp||"-"],["Instagram",emb.instagram||"-"],["Cupom",emb.cupom],["Chave Pix",emb.pix_key||<span style={{color:"#c00"}}>Nao cadastrada</span>]].map(([l,v])=>(
+                <div key={l} style={{display:"flex",gap:16,padding:"8px 0",borderBottom:`1px solid ${T.g100}`}}>
+                  <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,width:100,flexShrink:0,letterSpacing:"0.08em",textTransform:"uppercase"}}>{l}</span>
+                  <span style={{fontFamily:T.sans,fontSize:13}}>{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ============================================================
+// PAGE ADMIN SG
+// ============================================================
+function PageAdmin({user,onLogout}){
+  const [tab,setTab]=React.useState("dashboard");
+  const [embs,setEmbs]=React.useState([]);
+  const [ress,setRess]=React.useState([]);
+  const [todosResgates,setTodosResgates]=React.useState([]);
+  const [loading,setLoading]=React.useState(true);
+  const [busca,setBusca]=React.useState("");
+  const [ordemEmb,setOrdemEmb]=React.useState("data");
+  const [editEmb,setEditEmb]=React.useState(null);
+  const [editForm,setEditForm]=React.useState({});
+  const [msgEdit,setMsgEdit]=React.useState({text:"",ok:false});
+  const [savingEdit,setSavingEdit]=React.useState(false);
+  const [banner,setBanner]=React.useState("");
+  const [bannerPreview,setBannerPreview]=React.useState(null);
+  const [bannerCaption,setBannerCaption]=React.useState("");
+  const [uploadando,setUploadando]=React.useState(false);
+  const [salvandoCaption,setSalvandoCaption]=React.useState(false);
+  const [bannerAltura,setBannerAltura]=React.useState(200);
+  const [salvandoAltura,setSalvandoAltura]=React.useState(false);
+  const [msgBanner,setMsgBanner]=React.useState({text:"",ok:false});
+  const [dash,setDash]=React.useState(null);
+  const [dashPeriodo,setDashPeriodo]=React.useState(30);
+  const [dashModo,setDashModo]=React.useState("preset");
+  const [dashCustomDe,setDashCustomDe]=React.useState("");
+  const [dashCustomAte,setDashCustomAte]=React.useState("");
+  // CSV import
+  const [csvLinhas,setCsvLinhas]=React.useState([]);
+  const [csvErro,setCsvErro]=React.useState("");
+  const [importando,setImportando]=React.useState(false);
+  const [msgImport,setMsgImport]=React.useState({text:"",ok:false});
+
+  const filtrados=React.useMemo(()=>{
+    const base=embs.filter(e=>!busca||[e.nome,e.email,e.cupom].join(" ").toLowerCase().includes(busca.toLowerCase()));
+    return [...base].sort((a,b)=>{
+      if(ordemEmb==="nome")return(a.nome||"").localeCompare(b.nome||"","pt");
+      if(ordemEmb==="faturamento"){const fa=(a.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0),fb=(b.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0);return fb-fa;}
+      if(ordemEmb==="disponivel"){const da=(a.comissoes_sg||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0),db=(b.comissoes_sg||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);return db-da;}
+      return new Date(b.criado_em||0)-new Date(a.criado_em||0);
+    });
+  },[embs,busca,ordemEmb]);
+
+  React.useEffect(()=>{load();},[]);
+  React.useEffect(()=>{
+    if(dashModo==="preset")loadDashboard(dashPeriodo,null,null);
+    else if(dashCustomDe&&dashCustomAte)loadDashboard(null,dashCustomDe,dashCustomAte);
+  },[dashPeriodo,dashModo,dashCustomDe,dashCustomAte]);
+
+  async function load(){
+    setLoading(true);
+    const {data:e}=await supabase.from("embaixadores_sg").select("*, comissoes_sg(valor_comissao,status,resgatada)").order("criado_em",{ascending:false});
+    setEmbs(e||[]);
+    const {data:r}=await supabase.from("resgates_sg").select("*, embaixadores_sg(nome,email,cupom,pix_key)").eq("status","solicitado").order("criado_em",{ascending:false});
+    setRess(r||[]);
+    const {data:tr}=await supabase.from("resgates_sg").select("*, embaixadores_sg(nome,email,cupom,pix_key)").order("criado_em",{ascending:false});
+    setTodosResgates(tr||[]);
+    const {data:b}=await supabase.from("config").select("valor").eq("chave","banner_sg_ativo").maybeSingle();
+    if(b?.valor)setBanner(b.valor);
+    const {data:bc}=await supabase.from("config").select("valor").eq("chave","banner_sg_caption").maybeSingle();
+    setBannerCaption(bc?.valor||"");
+    const {data:ba}=await supabase.from("config").select("valor").eq("chave","banner_sg_altura").maybeSingle();
+    if(ba?.valor) setBannerAltura(Number(ba.valor));
+    setLoading(false);
+  }
+
+  async function loadDashboard(dias,customDe,customAte){
+    let desdeISO,ateISO;
+    if(customDe&&customAte){desdeISO=customDe;ateISO=customAte;}
+    else{desdeISO=daysAgoBR(dias);ateISO=daysAgoBR(0);}
+    const desde=desdeISO+"T00:00:00-03:00",ate=ateISO+"T23:59:59-03:00";
+    const msRange=new Date(ateISO).getTime()-new Date(desdeISO).getTime();
+    const diasRange=Math.round(msRange/86400000)+1;
+
+    const {data:coms}=await supabase.from("comissoes_sg").select("embaixador_sg_id,valor_pedido,valor_comissao,status,payment_status,criado_em").gte("criado_em",desde).lte("criado_em",ate).order("criado_em",{ascending:true});
+    const {data:todosEmbs}=await supabase.from("embaixadores_sg").select("id,nome,status,criado_em");
+    const {data:resgAll}=await supabase.from("resgates_sg").select("valor,status,criado_em").order("criado_em",{ascending:true});
+
+    const fatD={},cadD={};
+    for(let d=0;d<diasRange;d++){const dt=new Date(new Date(desdeISO).getTime()+d*86400000),key=dt.toISOString().slice(0,10);fatD[key]={f:0,c:0};cadD[key]={cadastros:0};}
+    (coms||[]).forEach(c=>{const k=toBRDate(c.criado_em);if(fatD[k]){fatD[k].f+=c.valor_pedido||0;fatD[k].c+=c.valor_comissao||0;}});
+    (todosEmbs||[]).filter(e=>e.criado_em>=desde&&e.criado_em<=ate).forEach(e=>{const k=toBRDate(e.criado_em);if(cadD[k])cadD[k].cadastros+=1;});
+
+    const timeline=Object.keys(fatD).sort().map(k=>({data:keyToLabel(k),fat:Math.round(fatD[k].f*100)/100,comissao:Math.round(fatD[k].c*100)/100,cadastros:cadD[k]?.cadastros||0}));
+    const pagos=(coms||[]).filter(c=>c.payment_status==="paid"||c.status==="confirmada");
+    const totalFat=pagos.reduce((s,c)=>s+(c.valor_pedido||0),0);
+    const totalCom=pagos.reduce((s,c)=>s+(c.valor_comissao||0),0);
+    const totalPed=pagos.length;
+    const ticketMedio=totalPed>0?totalFat/totalPed:0;
+    const ativas=(todosEmbs||[]).filter(e=>e.status==="ativo").length;
+    const comVenda=new Set(pagos.map(c=>c.embaixador_sg_id).filter(Boolean)).size;
+    const cadPeriodo=(todosEmbs||[]).filter(e=>toBRDate(e.criado_em)>=desdeISO&&toBRDate(e.criado_em)<=ateISO).length;
+
+    const rankMap={};
+    pagos.forEach(c=>{if(!c.embaixador_sg_id)return;if(!rankMap[c.embaixador_sg_id])rankMap[c.embaixador_sg_id]={id:c.embaixador_sg_id,fat:0,peds:0,com:0};rankMap[c.embaixador_sg_id].fat+=c.valor_pedido||0;rankMap[c.embaixador_sg_id].peds+=1;rankMap[c.embaixador_sg_id].com+=c.valor_comissao||0;});
+    const embMap={};(todosEmbs||[]).forEach(e=>embMap[e.id]=e.nome);
+    const top10=Object.values(rankMap).sort((a,b)=>b.fat-a.fat).slice(0,10).map(r=>({...r,nome:(embMap[r.id]||"?").split(" ").slice(0,2).join(" ")}));
+
+    const resgMap={};
+    (resgAll||[]).forEach(r=>{const k=toBRDate(r.criado_em).slice(0,7);if(!resgMap[k])resgMap[k]={mes:keyToMonthLabel(k),valor:0,qtd:0};resgMap[k].valor+=r.valor||0;resgMap[k].qtd+=1;});
+    const resgPorMes=Object.values(resgMap).sort((a,b)=>a.mes.localeCompare(b.mes)).slice(-6);
+
+    setDash({timeline,totalFat,totalCom,totalPed,ticketMedio,ativas,comVenda,cadPeriodo,top10,resgPorMes});
+  }
+
+  async function salvarBanner(ev){
+    const file=ev.target.files?.[0]; if(!file)return;
+    setUploadando(true); setMsgBanner({text:"",ok:false});
+    setBannerPreview(URL.createObjectURL(file));
+    const ext=file.name.split(".").pop(),path=`banners-sg/banner-sg-${Date.now()}.${ext}`;
+    const {error:upErr}=await supabase.storage.from("banners").upload(path,file,{upsert:true});
+    if(upErr){setMsgBanner({text:"Erro no upload: "+upErr.message,ok:false});setUploadando(false);return;}
+    const {data:pub}=supabase.storage.from("banners").getPublicUrl(path);
+    const url=pub.publicUrl;
+    await supabase.from("config").upsert({chave:"banner_sg_ativo",valor:url},{onConflict:"chave"});
+    setBanner(url); setBannerPreview(null);
+    setMsgBanner({text:"Banner atualizado!",ok:true});
+    setUploadando(false);
+  }
+
+  async function removerBanner(){
+    await supabase.from("config").upsert({chave:"banner_sg_ativo",valor:null},{onConflict:"chave"});
+    setBanner(""); setBannerPreview(null);
+    setMsgBanner({text:"Banner removido.",ok:true});
+  }
+
+  async function salvarBannerCaption(){
+    setSalvandoCaption(true);
+    await supabase.from("config").upsert({chave:"banner_sg_caption",valor:bannerCaption||null},{onConflict:"chave"});
+    setSalvandoCaption(false);
+    setMsgBanner({text:"Mensagem salva!",ok:true});
+  }
+
+  async function salvarAltura(){
+    setSalvandoAltura(true);
+    await supabase.from("config").upsert({chave:"banner_sg_altura",valor:String(bannerAltura)},{onConflict:"chave"});
+    setSalvandoAltura(false);
+    setMsgBanner({text:"Altura salva!",ok:true});
+  }
+
+  async function salvarEdicao(){
+    setSavingEdit(true); setMsgEdit({text:"",ok:false});
+    const {error}=await supabase.from("embaixadores_sg").update({nome:editForm.nome,email:editForm.email,whatsapp:editForm.whatsapp,instagram:editForm.instagram,tiktok:editForm.tiktok,cupom:editForm.cupom,status:editForm.status,pix_key:editForm.pix_key}).eq("id",editEmb.id);
+    if(error){setMsgEdit({text:"Erro: "+error.message,ok:false});}
+    else{setMsgEdit({text:"Salvo!",ok:true});setTimeout(()=>{setEditEmb(null);load();},800);}
+    setSavingEdit(false);
+  }
+
+  function parsarCSV(texto){
+    const linhas=texto.trim().split("\n").map(l=>l.split(/[,;]/).map(c=>c.trim().replace(/^"|"$/g,"")));
+    const header=linhas[0].map(h=>h.toLowerCase());
+    const get=(row,keys)=>{for(const k of keys){const i=header.indexOf(k);if(i>=0&&row[i])return row[i];}return "";};
+    return linhas.slice(1).filter(r=>r.length>1).map(row=>({
+      nome:get(row,["nome","name"]),email:get(row,["email","e-mail"]),
+      whatsapp:get(row,["whatsapp","telefone","phone"]),cupom:get(row,["cupom","coupon","codigo"]),
+      instagram:get(row,["instagram"]),status:"ativo",
+    })).filter(r=>r.nome&&r.email);
+  }
+
+  async function importarCSV(){
+    setImportando(true); setMsgImport({text:"",ok:false});
+    let ok=0,skip=0;
+    for(const linha of csvLinhas){
+      const {data:existe}=await supabase.from("embaixadores_sg").select("id").eq("email",linha.email).maybeSingle();
+      if(existe){skip++;continue;}
+      await supabase.from("embaixadores_sg").insert({...linha,criado_em:new Date().toISOString()});
+      ok++;
+    }
+    setMsgImport({text:`${ok} importadas, ${skip} ignoradas (ja existiam).`,ok:true});
+    setCsvLinhas([]); setImportando(false); await load();
+  }
+
+  function exportarCSV(){
+    const BOM="\uFEFF",sep=";";
+    const header=["Nome","E-mail","WhatsApp","Instagram","Cupom","Status","Faturamento","Disponivel"];
+    const rows=filtrados.map(e=>{
+      const fat=(e.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0).toFixed(2).replace(".",",");
+      const disp=(e.comissoes_sg||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0).toFixed(2).replace(".",",");
+      return[e.nome,e.email,e.whatsapp||"",e.instagram||"",e.cupom,e.status||"",fat,disp].join(sep);
+    });
+    const csv=BOM+[header.join(sep),...rows].join("\n");
+    const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="embaixadoras_sg.csv";a.click();
+  }
+
+  function exportarFinanceiroCSV(){
+    const BOM="\uFEFF",sep=";";
+    const header=["Nome","E-mail","Cupom","Chave Pix","Valor","Status","Data"];
+    const rows=todosResgates.map(r=>[r.embaixadores_sg?.nome||"",r.embaixadores_sg?.email||"",r.embaixadores_sg?.cupom||"",r.pix_key||r.embaixadores_sg?.pix_key||"",String(r.valor||0).replace(".",","),r.status||"",fmt(r.criado_em)].join(sep));
+    const csv=BOM+[header.join(sep),...rows].join("\n");
+    const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="resgates_sg.csv";a.click();
+  }
+
+  if(loading) return <div style={{minHeight:"100vh"}}><Header user={user} onLogout={onLogout} isAdmin/><Spinner/></div>;
+
+  return(
+    <div style={{minHeight:"100vh",background:T.white}}>
+      <Header user={user} onLogout={onLogout} isAdmin/>
+
+      {/* Modal editar embaixadora */}
+      {editEmb&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:24}} onClick={e=>{if(e.target===e.currentTarget)setEditEmb(null);}}>
+          <div style={{background:T.white,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",padding:40}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:24}}>Editar embaixadora</p>
+            <div style={{display:"flex",flexDirection:"column",gap:18}}>
+              {[["Nome","nome"],["E-mail","email"],["WhatsApp","whatsapp"],["Instagram","instagram"],["TikTok","tiktok"],["Cupom","cupom"],["Chave Pix","pix_key"]].map(([l,k])=>(
+                <Input key={k} label={l} value={editForm[k]||""} onChange={e=>setEditForm(p=>({...p,[k]:e.target.value}))}/>
+              ))}
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <label style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g600}}>Status</label>
+                <select value={editForm.status||"ativo"} onChange={e=>setEditForm(p=>({...p,status:e.target.value}))} style={{fontFamily:T.sans,fontSize:13,border:"none",borderBottom:`1px solid ${T.black}`,padding:"10px 0",outline:"none",background:"transparent"}}>
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                  <option value="pendente">Pendente</option>
+                </select>
+              </div>
+            </div>
+            {msgEdit.text&&<div style={{marginTop:16}}><Alert msg={msgEdit.text} ok={msgEdit.ok}/></div>}
+            <div style={{display:"flex",gap:12,marginTop:28}}>
+              <BtnPrimary onClick={salvarEdicao} loading={savingEdit} style={{width:"auto",padding:"12px 28px"}}>Salvar</BtnPrimary>
+              <BtnSecondary onClick={()=>setEditEmb(null)}>Cancelar</BtnSecondary>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Tabs
+        tabs={["dashboard","embaixadoras","resgates","financeiro","banner","importar"]}
+        labels={{dashboard:"Dashboard",embaixadoras:"Embaixadoras ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),financeiro:"Financeiro",banner:"Banner",importar:"Importar CSV"}}
+        active={tab} onChange={setTab}>
+
+
+        {/* ---- DASHBOARD ---- */}
+        {tab==="dashboard"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:32,flexWrap:"wrap",gap:16}}>
+              <div>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:4}}>Visao geral</p>
+                <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300}}>Embaixadoras SG</h2>
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                {["7","30"].map(d=>(
+                  <button key={d} onClick={()=>{setDashModo("preset");setDashPeriodo(Number(d));}}
+                    style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",border:`1px solid ${T.g200}`,padding:"8px 14px",cursor:"pointer",background:dashModo==="preset"&&dashPeriodo===Number(d)?T.black:"transparent",color:dashModo==="preset"&&dashPeriodo===Number(d)?T.white:T.g600}}>
+                    {d}D
+                  </button>
+                ))}
+                <button onClick={()=>setDashModo("custom")} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",border:`1px solid ${T.g200}`,padding:"8px 14px",cursor:"pointer",background:dashModo==="custom"?T.black:"transparent",color:dashModo==="custom"?T.white:T.g600}}>Personalizado</button>
+                {dashModo==="custom"&&(
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <input type="date" value={dashCustomDe} onChange={e=>setDashCustomDe(e.target.value)} style={{fontFamily:T.sans,fontSize:12,border:`1px solid ${T.g200}`,padding:"7px 10px",outline:"none"}}/>
+                    <span style={{fontFamily:T.sans,fontSize:12,color:T.g400}}>ate</span>
+                    <input type="date" value={dashCustomAte} onChange={e=>setDashCustomAte(e.target.value)} style={{fontFamily:T.sans,fontSize:12,border:`1px solid ${T.g200}`,padding:"7px 10px",outline:"none"}}/>
+                  </div>
+                )}
+              </div>
+            </div>
+            {!dash?<Spinner/>:(
+              <>
+                <StatGrid cols={4} items={[
+                  [brl(dash.totalFat),"Faturamento"],
+                  [brl(dash.totalCom),"Comissoes geradas"],
+                  [dash.totalPed,"Pedidos pagos"],
+                  [brl(dash.ticketMedio),"Ticket medio"],
+                  [dash.ativas,"Embaixadoras ativas"],
+                  [dash.comVenda,"Com venda no periodo"],
+                  [dash.cadPeriodo,"Novos cadastros"],
+                  [embs.length,"Total cadastradas"],
+                ]}/>
+                <div style={{marginBottom:40}}>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:16}}>Faturamento diario</p>
+                  <BarChartSVG data={dash.timeline} valueKey="fat" labelKey="data" isCurrency={true} secondKey="comissao" secondLabel="Comissao"/>
+                </div>
+                <div style={{marginBottom:40}}>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:16}}>Cadastros por dia</p>
+                  <BarChartSVG data={dash.timeline} valueKey="cadastros" labelKey="data" isCurrency={false}/>
+                </div>
+                <div style={{marginBottom:40}}>
+                  <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:16}}>Resgates por mes</p>
+                  <BarChartSVG data={dash.resgPorMes} valueKey="valor" labelKey="mes" isCurrency={true}/>
+                </div>
+                {dash.top10.length>0&&(
+                  <div>
+                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:16}}>Top 10 embaixadoras</p>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontFamily:T.sans}}>
+                      <thead><tr style={{borderBottom:`2px solid ${T.black}`}}>
+                        {["#","Nome","Pedidos","Faturamento","Comissao"].map(h=><th key={h} style={{fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",color:T.g400,fontWeight:400,padding:"8px 12px",textAlign:"left"}}>{h}</th>)}
+                      </tr></thead>
+                      <tbody>{dash.top10.map((r,i)=>(
+                        <tr key={r.id} style={{borderBottom:`1px solid ${T.g100}`,background:i%2===0?"transparent":"#fafafa"}}>
+                          <td style={{padding:"10px 12px",fontFamily:T.serif,fontSize:18,fontWeight:300,color:T.g400}}>{i+1}</td>
+                          <td style={{padding:"10px 12px",fontSize:13,fontWeight:500}}>{r.nome}</td>
+                          <td style={{padding:"10px 12px",fontSize:13}}>{r.peds}</td>
+                          <td style={{padding:"10px 12px",fontFamily:T.serif,fontSize:16,fontWeight:300}}>{brl(r.fat)}</td>
+                          <td style={{padding:"10px 12px",fontFamily:T.serif,fontSize:16,fontWeight:300,color:"#2a9d5c"}}>{brl(r.com)}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ---- EMBAIXADORAS ---- */}
+        {tab==="embaixadoras"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:24,flexWrap:"wrap",gap:16}}>
+              <div>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:4}}>Gestao</p>
+                <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300}}>Embaixadoras SG</h2>
+              </div>
+              <button onClick={exportarCSV} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",border:`1px solid ${T.g200}`,padding:"10px 16px",cursor:"pointer",background:"transparent",color:T.g600}}>Exportar CSV</button>
+            </div>
+            <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap",alignItems:"center"}}>
+              <input placeholder="Buscar nome, e-mail ou cupom..." value={busca} onChange={e=>setBusca(e.target.value)}
+                style={{fontFamily:T.sans,fontSize:13,border:`1px solid ${T.g200}`,padding:"10px 14px",outline:"none",flex:"1 1 220px",minWidth:180}}/>
+              <div style={{display:"flex",gap:4}}>
+                {[["data","Data"],["nome","Nome"],["faturamento","Faturamento"],["disponivel","Disponivel"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setOrdemEmb(v)} style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",border:`1px solid ${T.g200}`,padding:"8px 12px",cursor:"pointer",background:ordemEmb===v?T.black:"transparent",color:ordemEmb===v?T.white:T.g600}}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>{busca?filtrados.length+" encontradas":embs.length+" embaixadoras"}</p>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontFamily:T.sans}}>
+                <thead><tr style={{borderBottom:`2px solid ${T.black}`}}>
+                  {["Nome / Cupom","Contato","Status","Faturamento","Disponivel",""].map(h=><th key={h} style={{fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",color:T.g400,fontWeight:400,padding:"8px 12px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}
+                </tr></thead>
+                <tbody>{filtrados.map((e,i)=>{
+                  const fat=(e.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0);
+                  const disp=(e.comissoes_sg||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
+                  return(
+                    <tr key={e.id} style={{borderBottom:`1px solid ${T.g100}`,background:i%2===0?"transparent":"#fafafa",transition:"background 0.1s"}}>
+                      <td style={{padding:"12px 12px"}}>
+                        <p style={{fontSize:13,fontWeight:500,marginBottom:2}}>{e.nome}</p>
+                        <p style={{fontSize:10,color:T.g400,letterSpacing:"0.1em"}}>{e.cupom}</p>
+                      </td>
+                      <td style={{padding:"12px 12px"}}>
+                        <p style={{fontSize:12,color:T.g500}}>{e.email}</p>
+                        {e.whatsapp&&<p style={{fontSize:11,color:T.g400}}>{e.whatsapp}</p>}
+                      </td>
+                      <td style={{padding:"12px 12px"}}><Badge text={e.status||"ativo"} color={e.status==="ativo"?T.black:e.status==="inativo"?T.g400:"#c07000"}/></td>
+                      <td style={{padding:"12px 12px",fontFamily:T.serif,fontSize:16,fontWeight:300}}>{brl(fat)}</td>
+                      <td style={{padding:"12px 12px",fontFamily:T.serif,fontSize:16,fontWeight:300,color:disp>0?"#2a9d5c":T.g400}}>{brl(disp)}</td>
+                      <td style={{padding:"12px 12px"}}>
+                        <button onClick={()=>{setEditEmb(e);setEditForm({nome:e.nome,email:e.email,whatsapp:e.whatsapp||"",instagram:e.instagram||"",tiktok:e.tiktok||"",cupom:e.cupom,status:e.status||"ativo",pix_key:e.pix_key||""});setMsgEdit({text:"",ok:false});}}
+                          style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",border:`1px solid ${T.g200}`,padding:"6px 12px",cursor:"pointer",background:"transparent",color:T.g600,whiteSpace:"nowrap"}}>
+                          Editar
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ---- RESGATES ---- */}
+        {tab==="resgates"&&(
+          <div>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:4}}>Aprovacao</p>
+            <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300,marginBottom:32}}>Resgates pendentes</h2>
+            {ress.length===0
+              ? <p style={{fontFamily:T.sans,fontSize:14,color:T.g400}}>Nenhum resgate pendente.</p>
+              : ress.map(r=>{
+                async function aprovar(){
+                  await supabase.from("resgates_sg").update({status:"aprovado"}).eq("id",r.id);
+                  await load();
+                }
+                async function recusar(){
+                  await supabase.from("resgates_sg").update({status:"recusado"}).eq("id",r.id);
+                  const {data:coms}=await supabase.from("comissoes_sg").select("id").eq("embaixador_sg_id",r.embaixador_sg_id).eq("resgatada",true);
+                  if(coms?.length) await supabase.from("comissoes_sg").update({resgatada:false}).in("id",coms.map(c=>c.id));
+                  await load();
+                }
+                return(
+                  <div key={r.id} style={{border:`1px solid ${T.g200}`,padding:24,marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:16}}>
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:14,fontWeight:500,marginBottom:4}}>{r.embaixadores_sg?.nome}</p>
+                      <p style={{fontFamily:T.sans,fontSize:12,color:T.g500,marginBottom:2}}>{r.embaixadores_sg?.email}</p>
+                      <p style={{fontFamily:T.sans,fontSize:12,color:T.g500}}>Pix: {r.pix_key||r.embaixadores_sg?.pix_key||"-"}</p>
+                      <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:4}}>{fmt(r.criado_em)}</p>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <p style={{fontFamily:T.serif,fontSize:28,fontWeight:300,marginBottom:12}}>{brl(r.valor)}</p>
+                      <div style={{display:"flex",gap:8}}>
+                        <BtnPrimary onClick={aprovar} style={{width:"auto",padding:"10px 20px"}}>Aprovar</BtnPrimary>
+                        <BtnSecondary onClick={recusar}>Recusar</BtnSecondary>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+        )}
+
+        {/* ---- FINANCEIRO ---- */}
+        {tab==="financeiro"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:32}}>
+              <div>
+                <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:4}}>Historico</p>
+                <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300}}>Financeiro SG</h2>
+              </div>
+              <button onClick={exportarFinanceiroCSV} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.12em",textTransform:"uppercase",border:`1px solid ${T.g200}`,padding:"10px 16px",cursor:"pointer",background:"transparent",color:T.g600}}>Exportar CSV</button>
+            </div>
+            {todosResgates.length===0
+              ? <p style={{fontFamily:T.sans,fontSize:14,color:T.g400}}>Nenhum resgate ainda.</p>
+              : (<div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontFamily:T.sans}}>
+                  <thead><tr style={{borderBottom:`2px solid ${T.black}`}}>
+                    {["Nome","E-mail","Cupom","Pix","Valor","Status","Data"].map(h=><th key={h} style={{fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",color:T.g400,fontWeight:400,padding:"8px 12px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>{todosResgates.map((r,i)=>{
+                    async function marcarPago(){ await supabase.from("resgates_sg").update({status:"pago"}).eq("id",r.id); await load(); }
+                    const statusColor={solicitado:T.g400,aprovado:T.black,pago:"#2a9d5c",recusado:"#c00"};
+                    return(
+                      <tr key={r.id} style={{borderBottom:`1px solid ${T.g100}`,background:i%2===0?"transparent":"#fafafa"}}>
+                        <td style={{padding:"10px 12px",fontSize:13,fontWeight:500}}>{r.embaixadores_sg?.nome}</td>
+                        <td style={{padding:"10px 12px",fontSize:12,color:T.g500}}>{r.embaixadores_sg?.email}</td>
+                        <td style={{padding:"10px 12px",fontSize:12,color:T.g500,letterSpacing:"0.08em"}}>{r.embaixadores_sg?.cupom}</td>
+                        <td style={{padding:"10px 12px",fontSize:12,color:T.g500}}>{r.pix_key||r.embaixadores_sg?.pix_key||"-"}</td>
+                        <td style={{padding:"10px 12px",fontFamily:T.serif,fontSize:18,fontWeight:300}}>{brl(r.valor)}</td>
+                        <td style={{padding:"10px 12px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <Badge text={{solicitado:"Solicitado",aprovado:"Aprovado",pago:"Pago",recusado:"Recusado"}[r.status]||r.status} color={statusColor[r.status]||T.g400}/>
+                            {r.status==="aprovado"&&<button onClick={marcarPago} style={{fontFamily:T.sans,fontSize:8,letterSpacing:"0.1em",textTransform:"uppercase",border:"1px solid #2a9d5c",padding:"4px 8px",cursor:"pointer",background:"transparent",color:"#2a9d5c"}}>Pago</button>}
+                          </div>
+                        </td>
+                        <td style={{padding:"10px 12px",fontSize:12,color:T.g400}}>{fmt(r.criado_em)}</td>
+                      </tr>
+                    );
+                  })}</tbody>
+                </table>
+              </div>)
+            }
+          </div>
+        )}
+
+        {/* ---- BANNER ---- */}
+        {tab==="banner"&&(
+          <div style={{maxWidth:600}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:4}}>Comunicacao</p>
+            <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300,marginBottom:32}}>Banner Embaixadoras SG</h2>
+            {(bannerPreview||banner)&&<img src={bannerPreview||banner} alt="Banner atual" style={{width:"100%",maxHeight:220,objectFit:"cover",marginBottom:24,display:"block",border:`1px solid ${T.g200}`}}/>}
+            <div style={{marginBottom:24}}>
+              <label style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g600,display:"block",marginBottom:12}}>Imagem do banner</label>
+              <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+                <label style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",border:`1px solid ${T.g300}`,padding:"12px 20px",cursor:"pointer",color:T.g600}}>
+                  {uploadando?"Enviando...":"Escolher imagem"}
+                  <input type="file" accept="image/*" onChange={salvarBanner} style={{display:"none"}} disabled={uploadando}/>
+                </label>
+                {banner&&<BtnSecondary onClick={removerBanner}>Remover banner</BtnSecondary>}
+              </div>
+            </div>
+            <div style={{marginBottom:24}}>
+              <label style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g600,display:"block",marginBottom:6}}>Altura do banner</label>
+              <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:14}}>Define a altura maxima exibida no painel da embaixadora.</p>
+              <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                <input type="range" min={80} max={480} step={10} value={bannerAltura} onChange={e=>setBannerAltura(Number(e.target.value))}
+                  style={{flex:"1 1 200px",accentColor:T.black,cursor:"pointer"}}/>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <input type="number" min={80} max={480} step={10} value={bannerAltura} onChange={e=>setBannerAltura(Math.min(480,Math.max(80,Number(e.target.value))))}
+                    style={{fontFamily:T.sans,fontSize:14,border:`1px solid ${T.g200}`,padding:"8px 10px",width:80,outline:"none",textAlign:"center"}}/>
+                  <span style={{fontFamily:T.sans,fontSize:12,color:T.g400}}>px</span>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
+                {[[80,"Pequeno"],[160,"Medio"],[240,"Grande"],[360,"Extra grande"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setBannerAltura(v)}
+                    style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",border:`1px solid ${T.g200}`,padding:"6px 12px",cursor:"pointer",background:bannerAltura===v?T.black:"transparent",color:bannerAltura===v?T.white:T.g600}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div style={{marginTop:14}}><BtnPrimary onClick={salvarAltura} loading={salvandoAltura} style={{width:"auto",padding:"12px 28px"}}>Salvar altura</BtnPrimary></div>
+            </div>
+            <div style={{marginBottom:24}}>
+              <label style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g600,display:"block",marginBottom:12}}>Mensagem abaixo do banner</label>
+              <textarea value={bannerCaption} onChange={e=>setBannerCaption(e.target.value)} rows={4} placeholder="Texto que aparece abaixo da imagem no painel da embaixadora..."
+                style={{fontFamily:T.sans,fontSize:13,border:`1px solid ${T.g200}`,padding:14,width:"100%",outline:"none",resize:"vertical",lineHeight:1.7}}/>
+              <div style={{marginTop:12}}><BtnPrimary onClick={salvarBannerCaption} loading={salvandoCaption} style={{width:"auto",padding:"12px 28px"}}>Salvar mensagem</BtnPrimary></div>
+            </div>
+            {msgBanner.text&&<Alert msg={msgBanner.text} ok={msgBanner.ok}/>}
+          </div>
+        )}
+
+        {/* ---- IMPORTAR CSV ---- */}
+        {tab==="importar"&&(
+          <div style={{maxWidth:680}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g400,marginBottom:4}}>Importacao</p>
+            <h2 style={{fontFamily:T.serif,fontSize:36,fontWeight:300,marginBottom:8}}>Importar Embaixadoras</h2>
+            <p style={{fontFamily:T.sans,fontSize:13,color:T.g500,lineHeight:1.7,marginBottom:32}}>Importe uma lista em CSV. Colunas esperadas: <strong>nome, email, whatsapp, cupom, instagram</strong> (separadas por virgula ou ponto-e-virgula). E-mails ja cadastrados serao ignorados.</p>
+            <div style={{marginBottom:24}}>
+              <label style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",border:`1px solid ${T.g300}`,padding:"12px 20px",cursor:"pointer",color:T.g600,display:"inline-block"}}>
+                Selecionar arquivo CSV
+                <input type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={ev=>{
+                  setCsvErro(""); setCsvLinhas([]);
+                  const f=ev.target.files?.[0]; if(!f)return;
+                  const rd=new FileReader(); rd.onload=e=>{
+                    try{ const linhas=parsarCSV(e.target.result); if(!linhas.length){setCsvErro("Nenhuma linha valida encontrada.");return;} setCsvLinhas(linhas); }
+                    catch(err){ setCsvErro("Erro ao ler o arquivo: "+err.message); }
+                  }; rd.readAsText(f,"UTF-8");
+                }}/>
+              </label>
+            </div>
+            {csvErro&&<Alert msg={csvErro} ok={false}/>}
+            {csvLinhas.length>0&&(
+              <div>
+                <p style={{fontFamily:T.sans,fontSize:12,color:T.g500,marginBottom:16}}>{csvLinhas.length} linhas encontradas para importar:</p>
+                <div style={{maxHeight:300,overflowY:"auto",border:`1px solid ${T.g200}`,marginBottom:24}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontFamily:T.sans}}>
+                    <thead><tr style={{borderBottom:`1px solid ${T.g200}`,background:T.g100}}>
+                      {["Nome","E-mail","Cupom","WhatsApp"].map(h=><th key={h} style={{fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:T.g400,fontWeight:400,padding:"8px 12px",textAlign:"left"}}>{h}</th>)}
+                    </tr></thead>
+                    <tbody>{csvLinhas.map((l,i)=>(
+                      <tr key={i} style={{borderBottom:`1px solid ${T.g100}`}}>
+                        <td style={{padding:"8px 12px",fontSize:12}}>{l.nome}</td>
+                        <td style={{padding:"8px 12px",fontSize:12,color:T.g500}}>{l.email}</td>
+                        <td style={{padding:"8px 12px",fontSize:12,color:T.g500}}>{l.cupom||"-"}</td>
+                        <td style={{padding:"8px 12px",fontSize:12,color:T.g500}}>{l.whatsapp||"-"}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+                <BtnPrimary onClick={importarCSV} loading={importando} style={{width:"auto",padding:"14px 32px"}}>Importar {csvLinhas.length} embaixadoras</BtnPrimary>
+              </div>
+            )}
+            {msgImport.text&&<div style={{marginTop:16}}><Alert msg={msgImport.text} ok={msgImport.ok}/></div>}
+          </div>
+        )}
+
+      </Tabs>
+    </div>
+  );
+}
+
+
+// ============================================================
+// APP ROOT
+// ============================================================
+function App(){
+  const [user,setUser]=React.useState(null);
+  const [checked,setChecked]=React.useState(false);
+
+  React.useEffect(()=>{
+    supabase.auth.getSession().then(({data:{session}})=>{
+      setUser(session?.user||null); setChecked(true);
+    });
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((_,session)=>{
+      setUser(session?.user||null);
+    });
+    return()=>subscription.unsubscribe();
+  },[]);
+
+  if(!checked) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><Spinner/></div>;
+
+  async function handleLogout(){ await supabase.auth.signOut(); setUser(null); }
+
+  if(!user) return <PageLogin onLogin={setUser}/>;
+
+  const isAdmin=CONFIG.ADMIN_EMAILS.includes(user.email);
+  if(isAdmin) return <PageAdmin user={user} onLogout={handleLogout}/>;
+  return <PagePainel user={user} onLogout={handleLogout}/>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

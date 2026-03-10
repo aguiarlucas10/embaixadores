@@ -173,6 +173,7 @@ function Header({ user, onLogout, isAdmin=false }) {
       <Logo/>
       <div style={{display:"flex",alignItems:"center",gap:20}}>
         {isAdmin && <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",border:`1px solid ${T.black}`,padding:"3px 8px"}}>Admin</span>}
+        {isAdmin && <a href="index-sg.html" target="_blank" style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.15em",textTransform:"uppercase",border:`1px solid ${T.g300}`,padding:"3px 10px",color:T.g500,textDecoration:"none",transition:"all 0.15s"}} title="Abrir portal Embaixadoras SG">Portal SG</a>}
         {user && <button className="sg-btn-ghost" onClick={onLogout} style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",background:"none",border:"none",cursor:"pointer",color:T.g400,transition:"color 0.15s"}}>Sair</button>}
       </div>
     </header>
@@ -1050,6 +1051,7 @@ function PagePainel({ user, onLogout }) {
   const [rs, setRs] = React.useState([]);
   const [banner, setBanner] = React.useState(null);
   const [bannerCaption, setBannerCaption] = React.useState("");
+  const [bannerAltura, setBannerAltura] = React.useState(200);
   const [grupoLink, setGrupoLink] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [tab, setTab] = React.useState("inicio");
@@ -1090,6 +1092,8 @@ function PagePainel({ user, onLogout }) {
     if(b?.valor) setBanner(b.valor);
     const {data:bc} = await supabase.from("config").select("valor").eq("chave","banner_caption").maybeSingle();
     if(bc?.valor) setBannerCaption(bc.valor);
+    const {data:ba} = await supabase.from("config").select("valor").eq("chave","banner_altura").maybeSingle();
+    if(ba?.valor) setBannerAltura(Number(ba.valor));
     setLoading(false);
   }
 
@@ -1182,7 +1186,7 @@ function PagePainel({ user, onLogout }) {
         {/* Banner promoção ativa */}
         {banner && (
           <div style={{marginBottom:40,overflow:"hidden",borderRadius:0}}>
-            <img src={banner} alt="Promoção ativa" style={{width:"100%",maxHeight:300,objectFit:"cover",display:"block"}}/>
+            <img src={banner} alt="Promoção ativa" style={{width:"100%",maxHeight:bannerAltura,objectFit:"cover",display:"block"}}/>
             {bannerCaption && (
               <div style={{padding:"12px 16px",background:"#f9f9f9",borderTop:`1px solid ${T.g200}`}}>
                 <p style={{fontFamily:T.sans,fontSize:12,color:T.g500,lineHeight:1.7,margin:0}}>{bannerCaption}</p>
@@ -1448,6 +1452,8 @@ function PageAdmin({ user, onLogout }) {
   const [bannerPreview, setBannerPreview] = React.useState(null);
   const [bannerCaption, setBannerCaption] = React.useState("");
   const [salvandoCaption, setSalvandoCaption] = React.useState(false);
+  const [bannerAltura, setBannerAltura] = React.useState(200);
+  const [salvandoAltura, setSalvandoAltura] = React.useState(false);
   const [uploadando, setUploadando] = React.useState(false);
   const [msgBanner, setMsgBanner] = React.useState({text:"",ok:false});
   const [grupoLinkAdmin, setGrupoLinkAdmin] = React.useState("");
@@ -1475,6 +1481,8 @@ function PageAdmin({ user, onLogout }) {
     if(b?.valor) setBanner(b.valor);
     const {data:bc} = await supabase.from("config").select("valor").eq("chave","banner_caption").maybeSingle();
     setBannerCaption(bc?.valor||"");
+    const {data:ba} = await supabase.from("config").select("valor").eq("chave","banner_altura").maybeSingle();
+    if(ba?.valor) setBannerAltura(Number(ba.valor));
     const {data:gl} = await supabase.from("config").select("valor").eq("chave","grupo_vip_link").maybeSingle();
     if(gl?.valor) setGrupoLinkAdmin(gl.valor);
   }
@@ -1736,6 +1744,13 @@ function PageAdmin({ user, onLogout }) {
     await supabase.from("config").upsert({chave:"banner_caption",valor:bannerCaption||null},{onConflict:"chave"});
     setSalvandoCaption(false);
     setMsgBanner({text:"Mensagem salva com sucesso!",ok:true});
+  }
+
+  async function salvarAltura() {
+    setSalvandoAltura(true);
+    await supabase.from("config").upsert({chave:"banner_altura",valor:String(bannerAltura)},{onConflict:"chave"});
+    setSalvandoAltura(false);
+    setMsgBanner({text:"Altura salva!",ok:true});
   }
 
   async function removerBanner() {
@@ -2645,6 +2660,35 @@ function PageAdmin({ user, onLogout }) {
                 Remover banner
               </button>
             )}
+
+            {/* Altura do banner */}
+            <div style={{marginTop:32,paddingTop:32,borderTop:`1px solid ${T.g200}`}}>
+              <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:8}}>Altura do banner</p>
+              <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,lineHeight:1.7,marginBottom:16}}>Define a altura maxima exibida no painel das embaixadoras.</p>
+              <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                <input type="range" min={80} max={480} step={10} value={bannerAltura} onChange={e=>setBannerAltura(Number(e.target.value))}
+                  style={{flex:"1 1 200px",accentColor:T.black,cursor:"pointer"}}/>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <input type="number" min={80} max={480} step={10} value={bannerAltura} onChange={e=>setBannerAltura(Math.min(480,Math.max(80,Number(e.target.value))))}
+                    style={{fontFamily:T.sans,fontSize:14,border:`1px solid ${T.g200}`,padding:"8px 10px",width:80,outline:"none",textAlign:"center"}}/>
+                  <span style={{fontFamily:T.sans,fontSize:12,color:T.g400}}>px</span>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
+                {[[80,"Pequeno"],[160,"Medio"],[240,"Grande"],[360,"Extra grande"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setBannerAltura(v)}
+                    style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",border:`1px solid ${T.g200}`,padding:"6px 12px",cursor:"pointer",background:bannerAltura===v?T.black:"transparent",color:bannerAltura===v?T.white:T.g600}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div style={{marginTop:14}}>
+                <button onClick={salvarAltura} disabled={salvandoAltura}
+                  style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.15em",textTransform:"uppercase",background:T.black,color:T.white,border:"none",padding:"12px 24px",cursor:"pointer"}}>
+                  {salvandoAltura?"Salvando...":"Salvar altura"}
+                </button>
+              </div>
+            </div>
 
             {/* Mensagem abaixo do banner */}
             <div style={{marginTop:32,paddingTop:32,borderTop:`1px solid ${T.g200}`}}>
