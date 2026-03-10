@@ -1432,6 +1432,9 @@ function PageAdmin({ user, onLogout }) {
   const [msgEdit, setMsgEdit] = React.useState({text:"",ok:false});
   const [dash, setDash] = React.useState(null);
   const [dashPeriodo, setDashPeriodo] = React.useState(30);
+  const [dashModo, setDashModo] = React.useState("preset"); // "preset" | "custom"
+  const [dashCustomDe, setDashCustomDe] = React.useState("");
+  const [dashCustomAte, setDashCustomAte] = React.useState("");
   const [banner, setBanner] = React.useState("");
   const [bannerPreview, setBannerPreview] = React.useState(null);
   const [uploadando, setUploadando] = React.useState(false);
@@ -1467,48 +1470,53 @@ function PageAdmin({ user, onLogout }) {
   async function recusar(id){await supabase.from("resgates").update({status:"recusado"}).eq("id",id);await load();}
   async function feito(id){await supabase.from("embaixadores").update({ultimo_contato:new Date().toISOString()}).eq("id",id);setFila(f=>f.filter(x=>x.id!==id));}
 
-  React.useEffect(()=>{ loadDashboard(dashPeriodo); },[dashPeriodo]);
+  React.useEffect(()=>{
+    if(dashModo==="preset") loadDashboard(dashPeriodo, null, null);
+    else if(dashCustomDe && dashCustomAte) loadDashboard(null, dashCustomDe, dashCustomAte);
+  },[dashPeriodo, dashModo, dashCustomDe, dashCustomAte]);
 
-  async function loadDashboard(dias) {
+  async function loadDashboard(dias, customDe, customAte) {
     // Datas em horario de Brasilia (UTC-3)
     function toBRDate(dateStr) {
-      // Recebe ISO string do Supabase (UTC), converte para data local BR
       const d = new Date(dateStr);
-      // Ajusta para UTC-3
-      const br = new Date(d.getTime() - 3*60*60*1000);
-      return br.toISOString().slice(0,10); // YYYY-MM-DD no fuso BR
-    }
-    function todayBR() {
-      const d = new Date();
       const br = new Date(d.getTime() - 3*60*60*1000);
       return br.toISOString().slice(0,10);
     }
     function daysAgoBR(n) {
       const d = new Date();
       const br = new Date(d.getTime() - 3*60*60*1000 - n*86400000);
-      return br.toISOString().slice(0,10); // YYYY-MM-DD
+      return br.toISOString().slice(0,10);
     }
-    function keyToLabel(k) {
-      // YYYY-MM-DD -> DD/MM
-      return k.slice(8,10)+"/"+k.slice(5,7);
-    }
-    function keyToMonthLabel(k) {
-      // YYYY-MM -> MM/YY
-      return k.slice(5,7)+"/"+k.slice(2,4);
-    }
+    function keyToLabel(k) { return k.slice(8,10)+"/"+k.slice(5,7); }
+    function keyToMonthLabel(k) { return k.slice(5,7)+"/"+k.slice(2,4); }
 
-    const desde = daysAgoBR(dias)+"T00:00:00-03:00";
+    // Range de datas
+    let desdeISO, ateISO;
+    if(customDe && customAte) {
+      desdeISO = customDe;
+      ateISO   = customAte;
+    } else {
+      desdeISO = daysAgoBR(dias);
+      ateISO   = daysAgoBR(0);
+    }
+    const desde = desdeISO+"T00:00:00-03:00";
+    const ate   = ateISO+"T23:59:59-03:00";
 
-    const {data:coms}     = await supabase.from("comissoes").select("embaixador_id,valor_pedido,valor_comissao,status,payment_status,criado_em").gte("criado_em",desde).order("criado_em",{ascending:true});
+    // Calcular dias no range
+    const msRange = new Date(ateISO).getTime() - new Date(desdeISO).getTime();
+    const diasRange = Math.round(msRange/86400000) + 1;
+
+    const {data:coms}     = await supabase.from("comissoes").select("embaixador_id,valor_pedido,valor_comissao,status,payment_status,criado_em").gte("criado_em",desde).lte("criado_em",ate).order("criado_em",{ascending:true});
     const {data:todosEmbs}= await supabase.from("embaixadores").select("id,nome,status,criado_em");
     const {data:resgAll}  = await supabase.from("resgates").select("valor,status,criado_em").order("criado_em",{ascending:true});
-    const {data:views}    = await supabase.from("page_views").select("criado_em,dispositivo,sistema_operacional,navegador,utm_source,utm_medium,utm_campaign,etapa_saida,tempo_segundos").gte("criado_em",desde);
+    const {data:views}    = await supabase.from("page_views").select("criado_em,dispositivo,sistema_operacional,navegador,utm_source,utm_medium,utm_campaign,etapa_saida,tempo_segundos").gte("criado_em",desde).lte("criado_em",ate);
 
     // Init buckets per day em fuso BR
     const fatDiario = {};
     const cadDiario = {};
-    for(let d=0;d<dias;d++){
-      const key = daysAgoBR(dias-1-d);
+    for(let d=0;d<diasRange;d++){
+      const dt  = new Date(new Date(desdeISO).getTime() + d*86400000);
+      const key = dt.toISOString().slice(0,10);
       fatDiario[key] = {faturamento:0, comissao:0};
       cadDiario[key] = {cadastros:0, visitas:0};
     }
@@ -1540,8 +1548,7 @@ function PageAdmin({ user, onLogout }) {
     const ativas       = (todosEmbs||[]).filter(e=>e.status==="ativo").length;
     const comVenda     = new Set(pagos.map(c=>c.embaixador_id).filter(Boolean)).size;
     const visitasTotal = (views||[]).length;
-    const desdeISO = daysAgoBR(dias); // YYYY-MM-DD para comparar com toBRDate
-    const cadPeriodo   = (todosEmbs||[]).filter(e=>toBRDate(e.criado_em)>=desdeISO).length;
+    const cadPeriodo   = (todosEmbs||[]).filter(e=>toBRDate(e.criado_em)>=desdeISO && toBRDate(e.criado_em)<=ateISO).length;
     const txConversao  = visitasTotal>0?Math.round((cadPeriodo/visitasTotal)*100):0;
 
     const funil = [
@@ -1741,17 +1748,39 @@ function PageAdmin({ user, onLogout }) {
           <div className="fade-in">
 
             {/* Periodo selector */}
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:32}}>
-              {[30,90,180].map(d=>(
-                <button key={d} onClick={()=>setDashPeriodo(d)}
-                  style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",padding:"8px 16px",
-                    border:`1px solid ${dashPeriodo===d?T.black:T.g200}`,background:dashPeriodo===d?T.black:"transparent",
-                    color:dashPeriodo===d?T.white:T.g400,cursor:"pointer",transition:"all 0.15s"}}>
-                  {d}d
-                </button>
-              ))}
-              <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:8}}>Ultimos {dashPeriodo} dias</span>
-              {!dash && <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:16}}>Carregando...</span>}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:32,flexWrap:"wrap"}}>
+              {[{label:"7D",dias:7},{label:"30D",dias:30}].map(({label,dias})=>{
+                const ativo = dashModo==="preset" && dashPeriodo===dias;
+                return (
+                  <button key={label} onClick={()=>{ setDashModo("preset"); setDashPeriodo(dias); }}
+                    style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",padding:"8px 18px",
+                      border:`1px solid ${ativo?T.black:T.g200}`,background:ativo?T.black:"transparent",
+                      color:ativo?T.white:T.g400,cursor:"pointer",transition:"all 0.15s"}}>
+                    {label}
+                  </button>
+                );
+              })}
+              <button onClick={()=>setDashModo(dashModo==="custom"?"preset":"custom")}
+                style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",padding:"8px 18px",
+                  border:`1px solid ${dashModo==="custom"?T.black:T.g200}`,background:dashModo==="custom"?T.black:"transparent",
+                  color:dashModo==="custom"?T.white:T.g400,cursor:"pointer",transition:"all 0.15s"}}>
+                Personalizado
+              </button>
+              {dashModo==="custom" && (
+                <div style={{display:"flex",alignItems:"center",gap:8,marginLeft:4}}>
+                  <input type="date" value={dashCustomDe} onChange={e=>setDashCustomDe(e.target.value)}
+                    style={{fontFamily:T.sans,fontSize:11,padding:"7px 10px",border:`1px solid ${T.g200}`,outline:"none",color:T.black,background:T.white,cursor:"pointer"}}/>
+                  <span style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>ate</span>
+                  <input type="date" value={dashCustomAte} onChange={e=>setDashCustomAte(e.target.value)}
+                    style={{fontFamily:T.sans,fontSize:11,padding:"7px 10px",border:`1px solid ${T.g200}`,outline:"none",color:T.black,background:T.white,cursor:"pointer"}}/>
+                </div>
+              )}
+              {dashModo==="preset" && (
+                <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:4}}>
+                  Ultimos {dashPeriodo} dias
+                </span>
+              )}
+              {!dash && <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:8}}>Carregando...</span>}
             </div>
 
             {dash && (()=>{
@@ -1798,7 +1827,9 @@ function PageAdmin({ user, onLogout }) {
                 const ticks = yTicks(maxV,4);
                 const barSlot = CW/data.length;
                 const barPad  = Math.max(barSlot*0.2, 2);
-                const every   = Math.max(1, Math.ceil(data.length/8));
+                // Max labels that fit without overlap: label ~40px wide in 636px chart area
+                const maxLabels = Math.floor(636/48);
+                const every     = Math.max(1, Math.ceil(data.length/maxLabels));
                 const yOf = v => CH - (v/maxV)*CH;
                 return (
                   <div style={{position:"relative",userSelect:"none"}}>
@@ -1820,7 +1851,10 @@ function PageAdmin({ user, onLogout }) {
                           const bw1=secondKey?bw/2-1:bw;
                           const h1=Math.max((v1/maxV)*CH, v1>0?1:0);
                           const h2=Math.max((v2/maxV)*CH, v2>0?1:0);
-                          const showLbl=(i%every===0||i===data.length-1);
+                          // Show label if on interval; skip last if too close to prev shown label
+                          const lastShown = Math.floor((data.length-1)/every)*every;
+                          const tooClose  = (data.length-1 - lastShown) < Math.ceil(every*0.5);
+                          const showLbl   = (i%every===0) || (i===data.length-1 && !tooClose);
                           return (
                             <g key={i}
                               onMouseEnter={()=>setTooltip({i,x:x0+bw/2,v1,v2,label:d[labelKey]})}
@@ -1876,7 +1910,8 @@ function PageAdmin({ user, onLogout }) {
                 const ticks = yTicks(maxV,4);
                 const xStep = data.length>1?CW/(data.length-1):CW;
                 const yOf = v => CH-(v/maxV)*CH;
-                const every = Math.max(1,Math.ceil(data.length/8));
+                const maxLabels2 = Math.floor(636/48);
+                const every = Math.max(1,Math.ceil(data.length/maxLabels2));
                 // Build smooth path using straight lines (clean & legible)
                 const pathD = (k) => data.map((d,i)=>`${i===0?"M":"L"}${i*xStep},${yOf(d[k]||0)}`).join(" ");
                 // Area fill path
@@ -1911,7 +1946,10 @@ function PageAdmin({ user, onLogout }) {
                         ))}
                         {/* X labels */}
                         {data.map((d,i)=>{
-                          if(i%every!==0&&i!==data.length-1) return null;
+                          const lastShownL = Math.floor((data.length-1)/every)*every;
+                          const tooCloseL  = (data.length-1 - lastShownL) < Math.ceil(every*0.5);
+                          const showL = (i%every===0) || (i===data.length-1 && !tooCloseL);
+                          if(!showL) return null;
                           return <text key={"lx"+i} x={i*xStep} y={CH+24} textAnchor="middle" fontSize="10" fill="#bbb" fontFamily="sans-serif">{d[labelKey]}</text>;
                         })}
                         {/* Hover crosshair */}
@@ -1953,6 +1991,118 @@ function PageAdmin({ user, onLogout }) {
                 );
               }
 
+              // -- Combo: barras (barKey) + linha (lineKey) no mesmo eixo
+              function ComboChartSVG({data, barKey, barLabel, lineKey, lineLabel, labelKey}) {
+                const [tooltip, setTooltip] = React.useState(null);
+                if(!data||data.length===0) return (
+                  <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #f5f5f5"}}>
+                    <p style={{fontFamily:T.sans,fontSize:12,color:"#bbb",letterSpacing:"0.1em"}}>SEM DADOS NO PERIODO</p>
+                  </div>
+                );
+                const PAD={top:12,right:12,bottom:36,left:52};
+                const VW=700, VH=220;
+                const CW=VW-PAD.left-PAD.right;
+                const CH=VH-PAD.top-PAD.bottom;
+                const rawMax = Math.max(...data.map(d=>Math.max(d[barKey]||0, d[lineKey]||0)), 1);
+                const maxV   = niceMax(rawMax);
+                const ticks  = yTicks(maxV, 4);
+                const yOf    = v => CH - (v/maxV)*CH;
+                // Bar geometry
+                const barSlot = CW/data.length;
+                const barPad  = Math.max(barSlot*0.22, 2);
+                const bw      = barSlot - barPad*2;
+                // Line geometry (centered on bar)
+                const xCenter = i => i*barSlot + barSlot/2;
+                const pathD   = data.map((d,i)=>`${i===0?"M":"L"}${xCenter(i)},${yOf(d[lineKey]||0)}`).join(" ");
+                const areaD   = pathD + ` L${xCenter(data.length-1)},${CH} L${xCenter(0)},${CH} Z`;
+                // Label spacing
+                const maxLbls = Math.floor(CW/48);
+                const every   = Math.max(1, Math.ceil(data.length/maxLbls));
+                // Mouse hover
+                function handleMouse(e) {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const mx   = (e.clientX-rect.left)/rect.width*VW - PAD.left;
+                  const idx  = Math.max(0, Math.min(data.length-1, Math.floor(mx/barSlot)));
+                  setTooltip({i:idx});
+                }
+                const ttX = tooltip ? xCenter(tooltip.i) : 0;
+                return (
+                  <div style={{position:"relative",userSelect:"none"}}>
+                    {/* Legend */}
+                    <div style={{display:"flex",gap:20,marginBottom:10,paddingLeft:PAD.left}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{width:10,height:10,background:"#111",display:"inline-block",borderRadius:1}}/>
+                        <span style={{fontFamily:T.sans,fontSize:10,color:"#999",letterSpacing:"0.05em"}}>{barLabel}</span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{width:18,height:2,background:"#bbb",display:"inline-block"}}/>
+                        <span style={{fontFamily:T.sans,fontSize:10,color:"#999",letterSpacing:"0.05em"}}>{lineLabel}</span>
+                      </div>
+                    </div>
+                    <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{display:"block",overflow:"visible"}}
+                      onMouseMove={handleMouse} onMouseLeave={()=>setTooltip(null)}>
+                      <g transform={`translate(${PAD.left},${PAD.top})`}>
+                        {/* Grid + Y axis */}
+                        {ticks.map(t=>(
+                          <g key={t}>
+                            <line x1={0} y1={yOf(t)} x2={CW} y2={yOf(t)} stroke={t===0?"#ddd":"#f2f2f2"} strokeWidth="1"/>
+                            <text x={-8} y={yOf(t)+4} textAnchor="end" fontSize="11" fill="#bbb" fontFamily="sans-serif">{fmtY(t,false)}</text>
+                          </g>
+                        ))}
+                        {/* Bars (cadastros) */}
+                        {data.map((d,i)=>{
+                          const v  = d[barKey]||0;
+                          const h  = Math.max((v/maxV)*CH, v>0?1:0);
+                          const x0 = i*barSlot+barPad;
+                          return (
+                            <rect key={i} x={x0} y={yOf(v)} width={bw} height={h}
+                              fill="#111" opacity={tooltip&&tooltip.i===i?1:0.8}/>
+                          );
+                        })}
+                        {/* Area under line */}
+                        <path d={areaD} fill="#aaa" opacity="0.08"/>
+                        {/* Line (visitas) */}
+                        <path d={pathD} fill="none" stroke="#aaa" strokeWidth="2" strokeLinejoin="round"/>
+                        {/* Dots on line for hovered point */}
+                        {tooltip&&(
+                          <>
+                            <line x1={ttX} y1={0} x2={ttX} y2={CH} stroke="#eee" strokeWidth="1" strokeDasharray="3,3"/>
+                            <circle cx={ttX} cy={yOf(data[tooltip.i][lineKey]||0)} r="4" fill="#aaa" stroke="#fff" strokeWidth="2"/>
+                            <circle cx={ttX} cy={yOf(data[tooltip.i][barKey]||0)} r="4" fill="#111" stroke="#fff" strokeWidth="2"/>
+                          </>
+                        )}
+                        {/* X labels */}
+                        {data.map((d,i)=>{
+                          const lastS   = Math.floor((data.length-1)/every)*every;
+                          const tooClose= (data.length-1-lastS) < Math.ceil(every*0.5);
+                          const show    = (i%every===0)||(i===data.length-1&&!tooClose);
+                          if(!show) return null;
+                          return <text key={"xl"+i} x={xCenter(i)} y={CH+24} textAnchor="middle" fontSize="10" fill="#bbb" fontFamily="sans-serif">{d[labelKey]}</text>;
+                        })}
+                        {/* Baseline */}
+                        <line x1={0} y1={CH} x2={CW} y2={CH} stroke="#e0e0e0" strokeWidth="1"/>
+                      </g>
+                    </svg>
+                    {tooltip&&(
+                      <div style={{
+                        position:"absolute",top:8,
+                        left:`${(PAD.left+ttX)/VW*100}%`,
+                        transform:"translateX(-50%)",
+                        background:"#111",color:"#fff",
+                        fontFamily:T.sans,fontSize:11,
+                        padding:"8px 12px",
+                        pointerEvents:"none",whiteSpace:"nowrap",
+                        zIndex:10,letterSpacing:"0.03em",lineHeight:1.7
+                      }}>
+                        <div style={{color:"#888",fontSize:10,marginBottom:2}}>{data[tooltip.i][labelKey]}</div>
+                        <div>{barLabel}: <strong>{data[tooltip.i][barKey]||0}</strong></div>
+                        <div style={{color:"#ccc"}}>{lineLabel}: <strong>{data[tooltip.i][lineKey]||0}</strong></div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <div>
                   {/* KPI cards */}
@@ -1985,8 +2135,8 @@ function PageAdmin({ user, onLogout }) {
                   {/* Cadastros e visitas */}
                   <div style={{marginBottom:48}}>
                     <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Cadastros e visitas diarias</p>
-                    <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Visitas (cinza) vs novos cadastros (preto)</p>
-                    <LineChartSVG data={dash.timeline} keys={["visitas","cadastros"]} colors={["#bbb","#111"]} names={["Visitas","Cadastros"]} labelKey="data"/>
+                    <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Cadastros (barra) vs visitas (linha)</p>
+                    <ComboChartSVG data={dash.timeline} barKey="cadastros" barLabel="Cadastros" lineKey="visitas" lineLabel="Visitas" labelKey="data"/>
                   </div>
 
                   {/* Funil + Resgates */}
