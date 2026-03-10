@@ -1744,8 +1744,6 @@ function PageAdmin({ user, onLogout }) {
     setMsgBanner({text:"Banner removido.",ok:true});
   }
 
-  if(loading) return <div style={{minHeight:"100vh"}}><Header user={user} onLogout={onLogout} isAdmin/><Spinner/></div>;
-
   const filtrados = React.useMemo(()=>{
     const base = embs.filter(e=>!busca||[e.nome,e.email,e.cupom].join(" ").toLowerCase().includes(busca.toLowerCase()));
     return [...base].sort((a,b)=>{
@@ -1760,10 +1758,11 @@ function PageAdmin({ user, onLogout }) {
         const db=(b.comissoes||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
         return db-da;
       }
-      // default: data cadastro (mais recente primeiro)
       return new Date(b.criado_em||0)-new Date(a.criado_em||0);
     });
   },[embs,busca,ordemEmb]);
+
+  if(loading) return <div style={{minHeight:"100vh"}}><Header user={user} onLogout={onLogout} isAdmin/><Spinner/></div>;
 
   return (
     <div style={{minHeight:"100vh",background:T.white}}>
