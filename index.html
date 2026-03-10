@@ -1625,57 +1625,69 @@ function PageAdmin({ user, onLogout }) {
               const fmt2 = v => "R$ "+Math.round(v).toLocaleString("pt-BR");
 
               // -- SVG Bar Chart helper
-              function BarChartSVG({data, valueKey, labelKey, color="#000", h=180, secondKey, secondColor="#aaa"}) {
-                const max = Math.max(...data.map(d=>d[valueKey]+(secondKey?d[secondKey]:0)), 1);
-                const W=100/data.length;
-                const gap=0.3;
-                const labels = data.length>14 ? data.filter((_,i)=>i%Math.ceil(data.length/10)===0) : data;
+              // VW=600 VH=chartH+30 fixed viewBox, preserveAspectRatio xMidYMid meet
+              function BarChartSVG({data, valueKey, labelKey, color="#000", h=160, secondKey, secondColor="#bbb"}) {
+                if(!data||data.length===0) return <div style={{height:h,display:"flex",alignItems:"center",justifyContent:"center"}}><p style={{fontFamily:"sans-serif",fontSize:12,color:"#aaa"}}>Sem dados</p></div>;
+                const VW=600, VH=h+30;
+                const max = Math.max(...data.map(d=>(d[valueKey]||0)+(secondKey?(d[secondKey]||0):0)), 1);
+                const barArea = VW/data.length;
+                const pad = barArea*0.18;
+                // label every N bars so they don't overlap
+                const every = Math.ceil(data.length/10);
                 return (
-                  <svg width="100%" viewBox={`0 0 ${data.length*10} ${h+20}`} preserveAspectRatio="none" style={{display:"block"}}>
+                  <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{display:"block",overflow:"visible"}}>
+                    {/* grid lines */}
+                    {[0.25,0.5,0.75,1].map(f=>(
+                      <line key={f} x1={0} y1={h*(1-f)} x2={VW} y2={h*(1-f)} stroke="#f0f0f0" strokeWidth="1"/>
+                    ))}
                     {data.map((d,i)=>{
-                      const x = i*10;
-                      const val1 = d[valueKey]||0;
-                      const val2 = secondKey?(d[secondKey]||0):0;
-                      const h1 = (val1/max)*h;
-                      const h2 = (val2/max)*h;
-                      const barW = 10*(1-gap*2);
-                      const barW2 = barW/2-0.5;
+                      const x0 = i*barArea+pad;
+                      const bw = barArea-pad*2;
+                      const v1 = d[valueKey]||0;
+                      const v2 = secondKey?(d[secondKey]||0):0;
+                      const h1 = Math.max((v1/max)*h, v1>0?1:0);
+                      const h2 = Math.max((v2/max)*h, v2>0?1:0);
+                      const showLabel = i%every===0 || i===data.length-1;
                       return (
                         <g key={i}>
                           {secondKey ? (
                             <>
-                              <rect x={x+10*gap} y={h-h1} width={barW2} height={h1} fill={color}/>
-                              <rect x={x+10*gap+barW2+1} y={h-h2} width={barW2} height={h2} fill={secondColor}/>
+                              <rect x={x0}       y={h-h1} width={bw/2-1} height={h1} fill={color}/>
+                              <rect x={x0+bw/2+1} y={h-h2} width={bw/2-1} height={h2} fill={secondColor}/>
                             </>
                           ) : (
-                            <rect x={x+10*gap} y={h-h1} width={barW} height={h1} fill={color}/>
+                            <rect x={x0} y={h-h1} width={bw} height={h1} fill={color}/>
+                          )}
+                          {showLabel && (
+                            <text x={x0+bw/2} y={VH-4} textAnchor="middle" fontSize="11" fill="#aaa" fontFamily="sans-serif">{d[labelKey]}</text>
                           )}
                         </g>
                       );
-                    })}
-                    {data.map((d,i)=>{
-                      if(!labels.find(l=>l===d)) return null;
-                      return <text key={"l"+i} x={i*10+5} y={h+14} textAnchor="middle" fontSize="5" fill="#999" fontFamily="sans-serif">{d[labelKey]}</text>;
                     })}
                   </svg>
                 );
               }
 
               // -- SVG Line Chart helper
-              function LineChartSVG({data, keys, colors, labelKey, h=160}) {
+              function LineChartSVG({data, keys, colors, labelKey, h=140}) {
+                if(!data||data.length===0) return <div style={{height:h,display:"flex",alignItems:"center",justifyContent:"center"}}><p style={{fontFamily:"sans-serif",fontSize:12,color:"#aaa"}}>Sem dados</p></div>;
+                const VW=600, VH=h+30;
                 const maxVal = Math.max(...data.flatMap(d=>keys.map(k=>d[k]||0)),1);
-                const W = data.length>1 ? 100/(data.length-1) : 100;
-                const pts = (k) => data.map((d,i)=>`${i*W},${h-(((d[k]||0)/maxVal)*h)}`).join(" ");
-                const labels = data.length>14 ? data.filter((_,i)=>i%Math.ceil(data.length/10)===0) : data;
+                const xStep = data.length>1 ? VW/(data.length-1) : VW;
+                const yOf = v => h-((v/maxVal)*h);
+                const pts = (k) => data.map((d,i)=>`${i*xStep},${yOf(d[k]||0)}`).join(" ");
+                const every = Math.ceil(data.length/10);
                 return (
-                  <svg width="100%" viewBox={`0 0 100 ${h+20}`} preserveAspectRatio="none" style={{display:"block"}}>
-                    <line x1="0" y1={h} x2="100" y2={h} stroke="#eee" strokeWidth="0.5"/>
-                    {keys.map((k,ki)=>(
-                      <polyline key={k} points={pts(k)} fill="none" stroke={colors[ki]} strokeWidth="0.8"/>
+                  <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{display:"block",overflow:"visible"}}>
+                    {[0.25,0.5,0.75,1].map(f=>(
+                      <line key={f} x1={0} y1={h*(1-f)} x2={VW} y2={h*(1-f)} stroke="#f0f0f0" strokeWidth="1"/>
                     ))}
-                    {labels.map((d,i)=>{
-                      const idx = data.indexOf(d);
-                      return <text key={"l"+i} x={idx*W} y={h+14} textAnchor="middle" fontSize="4.5" fill="#999" fontFamily="sans-serif">{d[labelKey]}</text>;
+                    {keys.map((k,ki)=>(
+                      <polyline key={k} points={pts(k)} fill="none" stroke={colors[ki]} strokeWidth="2"/>
+                    ))}
+                    {data.map((d,i)=>{
+                      if(i%every!==0 && i!==data.length-1) return null;
+                      return <text key={"l"+i} x={i*xStep} y={VH-4} textAnchor="middle" fontSize="11" fill="#aaa" fontFamily="sans-serif">{d[labelKey]}</text>;
                     })}
                   </svg>
                 );
