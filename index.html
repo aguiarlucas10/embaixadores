@@ -440,9 +440,82 @@ function PageCadastro({ onNavigate }) {
   const [err, setErr] = React.useState("");
   const set = (k,v) => setF(p=>({...p,[k]:v}));
 
-  // Registra visita para analytics
+  // --- Analytics helper ---
+  function getDeviceInfo() {
+    const ua = navigator.userAgent;
+    // Dispositivo
+    const dispositivo = /Mobi|Android|iPhone|iPad/i.test(ua)
+      ? (/iPad|Tablet/i.test(ua) ? "tablet" : "mobile")
+      : "desktop";
+    // SO
+    const so = /iPhone|iPad/.test(ua) ? "iOS"
+      : /Android/.test(ua) ? "Android"
+      : /Windows/.test(ua) ? "Windows"
+      : /Mac/.test(ua) ? "Mac"
+      : /Linux/.test(ua) ? "Linux" : "outro";
+    // Navegador
+    const nav = /Edg\//.test(ua) ? "Edge"
+      : /OPR\/|Opera/.test(ua) ? "Opera"
+      : /Chrome\//.test(ua) ? "Chrome"
+      : /Firefox\//.test(ua) ? "Firefox"
+      : /Safari\//.test(ua) ? "Safari" : "outro";
+    // UTMs da URL
+    const params = new URLSearchParams(window.location.search);
+    return {
+      dispositivo,
+      sistema_operacional: so,
+      navegador: nav,
+      largura_tela: window.screen.width,
+      referrer: document.referrer || null,
+      url_completa: window.location.href,
+      utm_source:   params.get("utm_source")   || null,
+      utm_medium:   params.get("utm_medium")   || null,
+      utm_campaign: params.get("utm_campaign") || null,
+      utm_content:  params.get("utm_content")  || null,
+      utm_term:     params.get("utm_term")     || null,
+    };
+  }
+
+  // Registra visita ao abrir a página
+  const sessionIdRef = React.useRef(null);
+  const entradaRef   = React.useRef(Date.now());
   React.useEffect(()=>{
-    supabase.from("page_views").insert({pagina:"cadastro",referrer:document.referrer||null,criado_em:new Date().toISOString()}).then(()=>{});
+    const info = getDeviceInfo();
+    supabase.from("page_views").insert({
+      pagina: "cadastro",
+      etapa_entrada: "form",
+      etapa_saida: null,
+      tempo_segundos: null,
+      ...info,
+      criado_em: new Date().toISOString()
+    }).select("id").single().then(({data})=>{
+      if(data?.id) sessionIdRef.current = data.id;
+    });
+    // Registra etapa de saida ao fechar/sair
+    return ()=>{};
+  },[]);
+
+  // Atualiza etapa_saida e tempo quando etapa muda ou página fecha
+  const etapaRef = React.useRef("form");
+  React.useEffect(()=>{ etapaRef.current = etapa; },[etapa]);
+  React.useEffect(()=>{
+    function salvarSaida() {
+      if(!sessionIdRef.current) return;
+      const tempo = Math.round((Date.now()-entradaRef.current)/1000);
+      // Usa sendBeacon para garantir envio mesmo ao fechar aba
+      const payload = JSON.stringify({
+        id: sessionIdRef.current,
+        etapa_saida: etapaRef.current,
+        tempo_segundos: tempo
+      });
+      // Fallback via fetch
+      supabase.from("page_views").update({
+        etapa_saida: etapaRef.current,
+        tempo_segundos: tempo
+      }).eq("id", sessionIdRef.current).then(()=>{});
+    }
+    window.addEventListener("beforeunload", salvarSaida);
+    return ()=> window.removeEventListener("beforeunload", salvarSaida);
   },[]);
 
   // Gera opções de cupom a partir do nome
@@ -1402,7 +1475,7 @@ function PageAdmin({ user, onLogout }) {
     const {data:coms}     = await supabase.from("comissoes").select("embaixador_id,valor_pedido,valor_comissao,status,payment_status,criado_em").gte("criado_em",desde).order("criado_em",{ascending:true});
     const {data:todosEmbs}= await supabase.from("embaixadores").select("id,nome,status,criado_em");
     const {data:resgAll}  = await supabase.from("resgates").select("valor,status,criado_em").order("criado_em",{ascending:true});
-    const {data:views}    = await supabase.from("page_views").select("criado_em").gte("criado_em",desde);
+    const {data:views}    = await supabase.from("page_views").select("criado_em,dispositivo,sistema_operacional,navegador,utm_source,utm_medium,utm_campaign,etapa_saida,tempo_segundos").gte("criado_em",desde);
 
     // Init buckets per day
     const fatDiario = {};
@@ -1471,7 +1544,39 @@ function PageAdmin({ user, onLogout }) {
     });
     const resgPorMes=Object.values(resgMap).sort((a,b)=>a.mes.localeCompare(b.mes)).slice(-6);
 
-    setDash({timeline,totalFat,totalCom,totalPed,ticketMedio,ativas,comVenda,txConversao,funil,top10,resgPorMes,visitasTotal,cadPeriodo});
+    // -- Analytics de device / origem / funil comportamental
+    function contarPor(arr, campo) {
+      const m={};
+      arr.forEach(v=>{ const k=v[campo]||"desconhecido"; m[k]=(m[k]||0)+1; });
+      return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({label:k,qtd:v}));
+    }
+    const viewsArr = views||[];
+    const porDispositivo = contarPor(viewsArr,"dispositivo");
+    const porSO          = contarPor(viewsArr,"sistema_operacional");
+    const porNavegador   = contarPor(viewsArr,"navegador");
+    const porUtmSource   = contarPor(viewsArr.filter(v=>v.utm_source),"utm_source");
+    const porUtmCampaign = contarPor(viewsArr.filter(v=>v.utm_campaign),"utm_campaign");
+
+    // Funil comportamental: onde desistiram
+    const etapaSaida={form:0,cupom:0,sucesso:0,outros:0};
+    viewsArr.forEach(v=>{
+      const e=v.etapa_saida;
+      if(e==="form") etapaSaida.form++;
+      else if(e==="cupom") etapaSaida.cupom++;
+      else if(e==="sucesso") etapaSaida.sucesso++;
+      else etapaSaida.outros++;
+    });
+    const funilComportamental=[
+      {etapa:"Saiu no form",    qtd:etapaSaida.form,    pct:visitasTotal>0?Math.round(etapaSaida.form/visitasTotal*100):0},
+      {etapa:"Saiu no cupom",   qtd:etapaSaida.cupom,   pct:visitasTotal>0?Math.round(etapaSaida.cupom/visitasTotal*100):0},
+      {etapa:"Completou",       qtd:etapaSaida.sucesso, pct:visitasTotal>0?Math.round(etapaSaida.sucesso/visitasTotal*100):0},
+    ];
+    // Tempo medio na pagina (so quem tem dado)
+    const tempos=viewsArr.filter(v=>v.tempo_segundos>0).map(v=>v.tempo_segundos);
+    const tempoMedio=tempos.length>0?Math.round(tempos.reduce((s,v)=>s+v,0)/tempos.length):null;
+
+    setDash({timeline,totalFat,totalCom,totalPed,ticketMedio,ativas,comVenda,txConversao,funil,top10,resgPorMes,visitasTotal,cadPeriodo,
+      porDispositivo,porSO,porNavegador,porUtmSource,porUtmCampaign,funilComportamental,tempoMedio});
   }
 
 
@@ -1626,70 +1731,197 @@ function PageAdmin({ user, onLogout }) {
 
               // -- SVG Bar Chart helper
               // VW=600 VH=chartH+30 fixed viewBox, preserveAspectRatio xMidYMid meet
-              function BarChartSVG({data, valueKey, labelKey, color="#000", h=160, secondKey, secondColor="#bbb"}) {
-                if(!data||data.length===0) return <div style={{height:h,display:"flex",alignItems:"center",justifyContent:"center"}}><p style={{fontFamily:"sans-serif",fontSize:12,color:"#aaa"}}>Sem dados</p></div>;
-                const VW=600, VH=h+30;
-                const max = Math.max(...data.map(d=>(d[valueKey]||0)+(secondKey?(d[secondKey]||0):0)), 1);
-                const barArea = VW/data.length;
-                const pad = barArea*0.18;
-                // label every N bars so they don't overlap
-                const every = Math.ceil(data.length/10);
+              // ================================================================
+              // CHART COMPONENTS - professional SVG with tooltip, Y-axis, grid
+              // ================================================================
+
+              // Nice round tick values for Y axis
+              function niceMax(val) {
+                if(val===0) return 10;
+                const mag = Math.pow(10, Math.floor(Math.log10(val)));
+                const norm = val/mag;
+                const nice = norm<=1?1:norm<=2?2:norm<=5?5:10;
+                return nice*mag;
+              }
+              function yTicks(max, count=4) {
+                const step = max/count;
+                return Array.from({length:count+1},(_,i)=>i*step);
+              }
+              function fmtY(v, isCurrency) {
+                if(!isCurrency) return v>=1000?(v/1000).toFixed(1)+"k":String(Math.round(v));
+                if(v===0) return "0";
+                if(v>=1000) return "R$"+(v/1000).toFixed(v>=10000?0:1)+"k";
+                return "R$"+Math.round(v);
+              }
+
+              function BarChartSVG({data, valueKey, labelKey, isCurrency=false, secondKey, secondLabel}) {
+                const [tooltip, setTooltip] = React.useState(null);
+                if(!data||data.length===0) return (
+                  <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #f5f5f5"}}>
+                    <p style={{fontFamily:T.sans,fontSize:12,color:"#bbb",letterSpacing:"0.1em"}}>SEM DADOS NO PERIODO</p>
+                  </div>
+                );
+                const PAD={top:12,right:12,bottom:36,left:52};
+                const VW=700, VH=220;
+                const CW=VW-PAD.left-PAD.right;
+                const CH=VH-PAD.top-PAD.bottom;
+                const rawMax = Math.max(...data.map(d=>(d[valueKey]||0)+(secondKey?(d[secondKey]||0):0)),1);
+                const maxV = niceMax(rawMax);
+                const ticks = yTicks(maxV,4);
+                const barSlot = CW/data.length;
+                const barPad  = Math.max(barSlot*0.2, 2);
+                const every   = Math.max(1, Math.ceil(data.length/8));
+                const yOf = v => CH - (v/maxV)*CH;
                 return (
-                  <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{display:"block",overflow:"visible"}}>
-                    {/* grid lines */}
-                    {[0.25,0.5,0.75,1].map(f=>(
-                      <line key={f} x1={0} y1={h*(1-f)} x2={VW} y2={h*(1-f)} stroke="#f0f0f0" strokeWidth="1"/>
-                    ))}
-                    {data.map((d,i)=>{
-                      const x0 = i*barArea+pad;
-                      const bw = barArea-pad*2;
-                      const v1 = d[valueKey]||0;
-                      const v2 = secondKey?(d[secondKey]||0):0;
-                      const h1 = Math.max((v1/max)*h, v1>0?1:0);
-                      const h2 = Math.max((v2/max)*h, v2>0?1:0);
-                      const showLabel = i%every===0 || i===data.length-1;
-                      return (
-                        <g key={i}>
-                          {secondKey ? (
-                            <>
-                              <rect x={x0}       y={h-h1} width={bw/2-1} height={h1} fill={color}/>
-                              <rect x={x0+bw/2+1} y={h-h2} width={bw/2-1} height={h2} fill={secondColor}/>
-                            </>
-                          ) : (
-                            <rect x={x0} y={h-h1} width={bw} height={h1} fill={color}/>
-                          )}
-                          {showLabel && (
-                            <text x={x0+bw/2} y={VH-4} textAnchor="middle" fontSize="11" fill="#aaa" fontFamily="sans-serif">{d[labelKey]}</text>
-                          )}
-                        </g>
-                      );
-                    })}
-                  </svg>
+                  <div style={{position:"relative",userSelect:"none"}}>
+                    <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{display:"block",overflow:"visible"}}>
+                      <g transform={`translate(${PAD.left},${PAD.top})`}>
+                        {/* Y grid + labels */}
+                        {ticks.map(t=>(
+                          <g key={t}>
+                            <line x1={0} y1={yOf(t)} x2={CW} y2={yOf(t)} stroke={t===0?"#ddd":"#f2f2f2"} strokeWidth={t===0?"1":"1"}/>
+                            <text x={-8} y={yOf(t)+4} textAnchor="end" fontSize="11" fill="#bbb" fontFamily="sans-serif">{fmtY(t,isCurrency)}</text>
+                          </g>
+                        ))}
+                        {/* Bars */}
+                        {data.map((d,i)=>{
+                          const v1=d[valueKey]||0;
+                          const v2=secondKey?(d[secondKey]||0):0;
+                          const x0=i*barSlot+barPad;
+                          const bw=barSlot-barPad*2;
+                          const bw1=secondKey?bw/2-1:bw;
+                          const h1=Math.max((v1/maxV)*CH, v1>0?1:0);
+                          const h2=Math.max((v2/maxV)*CH, v2>0?1:0);
+                          const showLbl=(i%every===0||i===data.length-1);
+                          return (
+                            <g key={i}
+                              onMouseEnter={()=>setTooltip({i,x:x0+bw/2,v1,v2,label:d[labelKey]})}
+                              onMouseLeave={()=>setTooltip(null)}
+                              style={{cursor:"default"}}>
+                              <rect x={x0} y={yOf(v1)} width={bw1} height={h1} fill="#111" opacity={tooltip&&tooltip.i===i?1:0.85}/>
+                              {secondKey&&<rect x={x0+bw/2+1} y={yOf(v2)} width={bw1} height={h2} fill="#ccc" opacity={tooltip&&tooltip.i===i?1:0.85}/>}
+                              {showLbl&&<text x={x0+bw/2} y={CH+24} textAnchor="middle" fontSize="10" fill="#bbb" fontFamily="sans-serif">{d[labelKey]}</text>}
+                            </g>
+                          );
+                        })}
+                        {/* Baseline */}
+                        <line x1={0} y1={CH} x2={CW} y2={CH} stroke="#e0e0e0" strokeWidth="1"/>
+                      </g>
+                    </svg>
+                    {/* Tooltip */}
+                    {tooltip&&(
+                      <div style={{
+                        position:"absolute",top:8,
+                        left:`${(PAD.left+tooltip.x)/VW*100}%`,
+                        transform:"translateX(-50%)",
+                        background:"#111",color:"#fff",
+                        fontFamily:T.sans,fontSize:11,
+                        padding:"8px 12px",
+                        pointerEvents:"none",
+                        whiteSpace:"nowrap",
+                        zIndex:10,
+                        letterSpacing:"0.03em",
+                        lineHeight:1.7
+                      }}>
+                        <div style={{color:"#888",fontSize:10,marginBottom:2}}>{tooltip.label}</div>
+                        <div>{isCurrency?"R$ "+tooltip.v1.toLocaleString("pt-BR",{minimumFractionDigits:2}):tooltip.v1}</div>
+                        {secondKey&&<div style={{color:"#ccc"}}>{secondLabel}: {isCurrency?"R$ "+tooltip.v2.toLocaleString("pt-BR",{minimumFractionDigits:2}):tooltip.v2}</div>}
+                      </div>
+                    )}
+                  </div>
                 );
               }
 
-              // -- SVG Line Chart helper
-              function LineChartSVG({data, keys, colors, labelKey, h=140}) {
-                if(!data||data.length===0) return <div style={{height:h,display:"flex",alignItems:"center",justifyContent:"center"}}><p style={{fontFamily:"sans-serif",fontSize:12,color:"#aaa"}}>Sem dados</p></div>;
-                const VW=600, VH=h+30;
-                const maxVal = Math.max(...data.flatMap(d=>keys.map(k=>d[k]||0)),1);
-                const xStep = data.length>1 ? VW/(data.length-1) : VW;
-                const yOf = v => h-((v/maxVal)*h);
-                const pts = (k) => data.map((d,i)=>`${i*xStep},${yOf(d[k]||0)}`).join(" ");
-                const every = Math.ceil(data.length/10);
+              function LineChartSVG({data, keys, colors, names, labelKey, isCurrency=false}) {
+                const [tooltip, setTooltip] = React.useState(null);
+                if(!data||data.length===0) return (
+                  <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid #f5f5f5"}}>
+                    <p style={{fontFamily:T.sans,fontSize:12,color:"#bbb",letterSpacing:"0.1em"}}>SEM DADOS NO PERIODO</p>
+                  </div>
+                );
+                const PAD={top:12,right:12,bottom:36,left:52};
+                const VW=700, VH=200;
+                const CW=VW-PAD.left-PAD.right;
+                const CH=VH-PAD.top-PAD.bottom;
+                const rawMax = Math.max(...data.flatMap(d=>keys.map(k=>d[k]||0)),1);
+                const maxV = niceMax(rawMax);
+                const ticks = yTicks(maxV,4);
+                const xStep = data.length>1?CW/(data.length-1):CW;
+                const yOf = v => CH-(v/maxV)*CH;
+                const every = Math.max(1,Math.ceil(data.length/8));
+                // Build smooth path using straight lines (clean & legible)
+                const pathD = (k) => data.map((d,i)=>`${i===0?"M":"L"}${i*xStep},${yOf(d[k]||0)}`).join(" ");
+                // Area fill path
+                const areaD = (k) => pathD(k)+` L${(data.length-1)*xStep},${CH} L0,${CH} Z`;
+                // Find hovered index by x position
+                function handleMouse(e) {
+                  const svg = e.currentTarget;
+                  const rect = svg.getBoundingClientRect();
+                  const mx = (e.clientX-rect.left)/rect.width*VW - PAD.left;
+                  const idx = Math.max(0,Math.min(data.length-1,Math.round(mx/xStep)));
+                  setTooltip({i:idx,x:idx*xStep});
+                }
                 return (
-                  <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{display:"block",overflow:"visible"}}>
-                    {[0.25,0.5,0.75,1].map(f=>(
-                      <line key={f} x1={0} y1={h*(1-f)} x2={VW} y2={h*(1-f)} stroke="#f0f0f0" strokeWidth="1"/>
-                    ))}
-                    {keys.map((k,ki)=>(
-                      <polyline key={k} points={pts(k)} fill="none" stroke={colors[ki]} strokeWidth="2"/>
-                    ))}
-                    {data.map((d,i)=>{
-                      if(i%every!==0 && i!==data.length-1) return null;
-                      return <text key={"l"+i} x={i*xStep} y={VH-4} textAnchor="middle" fontSize="11" fill="#aaa" fontFamily="sans-serif">{d[labelKey]}</text>;
-                    })}
-                  </svg>
+                  <div style={{position:"relative",userSelect:"none"}}>
+                    <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{display:"block",overflow:"visible"}}
+                      onMouseMove={handleMouse} onMouseLeave={()=>setTooltip(null)}>
+                      <g transform={`translate(${PAD.left},${PAD.top})`}>
+                        {/* Y grid */}
+                        {ticks.map(t=>(
+                          <g key={t}>
+                            <line x1={0} y1={yOf(t)} x2={CW} y2={yOf(t)} stroke={t===0?"#ddd":"#f2f2f2"} strokeWidth="1"/>
+                            <text x={-8} y={yOf(t)+4} textAnchor="end" fontSize="11" fill="#bbb" fontFamily="sans-serif">{fmtY(t,isCurrency)}</text>
+                          </g>
+                        ))}
+                        {/* Area fills */}
+                        {keys.map((k,ki)=>(
+                          <path key={"a"+k} d={areaD(k)} fill={colors[ki]} opacity="0.06"/>
+                        ))}
+                        {/* Lines */}
+                        {keys.map((k,ki)=>(
+                          <path key={k} d={pathD(k)} fill="none" stroke={colors[ki]} strokeWidth={ki===0?"2":"1.5"} strokeLinejoin="round"/>
+                        ))}
+                        {/* X labels */}
+                        {data.map((d,i)=>{
+                          if(i%every!==0&&i!==data.length-1) return null;
+                          return <text key={"lx"+i} x={i*xStep} y={CH+24} textAnchor="middle" fontSize="10" fill="#bbb" fontFamily="sans-serif">{d[labelKey]}</text>;
+                        })}
+                        {/* Hover crosshair */}
+                        {tooltip&&(
+                          <>
+                            <line x1={tooltip.x} y1={0} x2={tooltip.x} y2={CH} stroke="#ddd" strokeWidth="1" strokeDasharray="3,3"/>
+                            {keys.map((k,ki)=>(
+                              <circle key={"dot"+k} cx={tooltip.x} cy={yOf(data[tooltip.i][k]||0)} r="4" fill={colors[ki]} stroke="#fff" strokeWidth="2"/>
+                            ))}
+                          </>
+                        )}
+                        {/* Baseline */}
+                        <line x1={0} y1={CH} x2={CW} y2={CH} stroke="#e0e0e0" strokeWidth="1"/>
+                      </g>
+                    </svg>
+                    {tooltip&&(
+                      <div style={{
+                        position:"absolute",top:8,
+                        left:`${(PAD.left+tooltip.x)/VW*100}%`,
+                        transform:"translateX(-50%)",
+                        background:"#111",color:"#fff",
+                        fontFamily:T.sans,fontSize:11,
+                        padding:"8px 12px",
+                        pointerEvents:"none",
+                        whiteSpace:"nowrap",
+                        zIndex:10,
+                        letterSpacing:"0.03em",
+                        lineHeight:1.7
+                      }}>
+                        <div style={{color:"#888",fontSize:10,marginBottom:2}}>{data[tooltip.i][labelKey]}</div>
+                        {keys.map((k,ki)=>(
+                          <div key={k} style={{color:ki===0?"#fff":"#ccc"}}>
+                            {names[ki]}: <strong>{isCurrency?"R$ "+( data[tooltip.i][k]||0).toLocaleString("pt-BR",{minimumFractionDigits:2}):(data[tooltip.i][k]||0)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
               }
 
@@ -1719,14 +1951,14 @@ function PageAdmin({ user, onLogout }) {
                   <div style={{marginBottom:48}}>
                     <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Faturamento diario</p>
                     <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Pedidos pagos (preto) vs comissao gerada (cinza)</p>
-                    <BarChartSVG data={dash.timeline} valueKey="fat" secondKey="comissao" labelKey="data" color="#000" secondColor="#bbb" h={180}/>
+                    <BarChartSVG data={dash.timeline} valueKey="fat" secondKey="comissao" secondLabel="Comissao" labelKey="data" isCurrency={true}/>
                   </div>
 
                   {/* Cadastros e visitas */}
                   <div style={{marginBottom:48}}>
                     <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Cadastros e visitas diarias</p>
                     <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Visitas (cinza) vs novos cadastros (preto)</p>
-                    <LineChartSVG data={dash.timeline} keys={["visitas","cadastros"]} colors={["#bbb","#000"]} labelKey="data" h={140}/>
+                    <LineChartSVG data={dash.timeline} keys={["visitas","cadastros"]} colors={["#bbb","#111"]} names={["Visitas","Cadastros"]} labelKey="data"/>
                   </div>
 
                   {/* Funil + Resgates */}
@@ -1755,7 +1987,7 @@ function PageAdmin({ user, onLogout }) {
                     <div>
                       <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Resgates por mes</p>
                       <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Ultimos 6 meses</p>
-                      <BarChartSVG data={dash.resgPorMes} valueKey="valor" labelKey="mes" color="#000" h={140}/>
+                      <BarChartSVG data={dash.resgPorMes} valueKey="valor" labelKey="mes" isCurrency={true}/>
                       <div style={{display:"flex",gap:16,marginTop:8,flexWrap:"wrap"}}>
                         {dash.resgPorMes.map(r=>(
                           <div key={r.mes} style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>
@@ -1787,6 +2019,152 @@ function PageAdmin({ user, onLogout }) {
                         </div>
                       ))
                     }
+                  </div>
+
+                  {/* DIVISOR */}
+                  <div style={{borderTop:`1px solid ${T.g200}`,margin:"48px 0 40px"}}/>
+
+                  {/* SECAO ANALYTICS DE AUDIENCIA */}
+                  <p style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.25em",textTransform:"uppercase",color:T.g400,marginBottom:32}}>
+                    Analytics de audiencia
+                    {dash.tempoMedio!==null && <span style={{marginLeft:16,fontWeight:400}}>Tempo medio na pagina: <strong style={{color:T.black}}>{dash.tempoMedio}s</strong></span>}
+                  </p>
+
+                  {/* Funil comportamental */}
+                  <div style={{marginBottom:48}}>
+                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Onde as pessoas saem</p>
+                    {dash.funilComportamental.map((f,i)=>{
+                      const cores=["#d44","#e8a020","#2a9d5c"];
+                      return (
+                        <div key={f.etapa} style={{marginBottom:14}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                            <span style={{fontFamily:T.sans,fontSize:12}}>{f.etapa}</span>
+                            <span style={{fontFamily:T.sans,fontSize:12,color:T.g400}}>{f.qtd} visitas <strong style={{color:cores[i]}}>{f.pct}%</strong></span>
+                          </div>
+                          <div style={{height:6,background:T.g100,borderRadius:3}}>
+                            <div style={{height:"100%",width:f.pct+"%",background:cores[i],borderRadius:3,transition:"width 0.6s"}}/>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Device + SO + Browser em grid */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:40,marginBottom:48}}>
+
+                    {/* Dispositivo */}
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>Dispositivo</p>
+                      {dash.porDispositivo.length===0
+                        ? <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>Sem dados ainda</p>
+                        : dash.porDispositivo.map(({label,qtd})=>{
+                          const pct=dash.visitasTotal>0?Math.round(qtd/dash.visitasTotal*100):0;
+                          return (
+                            <div key={label} style={{marginBottom:10}}>
+                              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                                <span style={{fontFamily:T.sans,fontSize:11,textTransform:"capitalize"}}>{label}</span>
+                                <span style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{qtd} <span style={{color:T.black,fontWeight:500}}>{pct}%</span></span>
+                              </div>
+                              <div style={{height:4,background:T.g100,borderRadius:2}}>
+                                <div style={{height:"100%",width:pct+"%",background:T.black,borderRadius:2}}/>
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
+
+                    {/* Sistema Operacional */}
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>Sistema operacional</p>
+                      {dash.porSO.length===0
+                        ? <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>Sem dados ainda</p>
+                        : dash.porSO.map(({label,qtd})=>{
+                          const pct=dash.visitasTotal>0?Math.round(qtd/dash.visitasTotal*100):0;
+                          return (
+                            <div key={label} style={{marginBottom:10}}>
+                              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                                <span style={{fontFamily:T.sans,fontSize:11}}>{label}</span>
+                                <span style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{qtd} <span style={{color:T.black,fontWeight:500}}>{pct}%</span></span>
+                              </div>
+                              <div style={{height:4,background:T.g100,borderRadius:2}}>
+                                <div style={{height:"100%",width:pct+"%",background:T.black,borderRadius:2}}/>
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
+
+                    {/* Navegador */}
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>Navegador</p>
+                      {dash.porNavegador.length===0
+                        ? <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>Sem dados ainda</p>
+                        : dash.porNavegador.map(({label,qtd})=>{
+                          const pct=dash.visitasTotal>0?Math.round(qtd/dash.visitasTotal*100):0;
+                          return (
+                            <div key={label} style={{marginBottom:10}}>
+                              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                                <span style={{fontFamily:T.sans,fontSize:11}}>{label}</span>
+                                <span style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{qtd} <span style={{color:T.black,fontWeight:500}}>{pct}%</span></span>
+                              </div>
+                              <div style={{height:4,background:T.g100,borderRadius:2}}>
+                                <div style={{height:"100%",width:pct+"%",background:T.black,borderRadius:2}}/>
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
+                  </div>
+
+                  {/* UTMs */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,marginBottom:48}}>
+
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>Origem (utm_source)</p>
+                      {dash.porUtmSource.length===0
+                        ? <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>Nenhuma visita com UTM ainda. Adicione <code style={{background:T.g100,padding:"2px 5px"}}>?utm_source=instagram</code> nos seus links.</p>
+                        : dash.porUtmSource.map(({label,qtd})=>{
+                          const max=dash.porUtmSource[0].qtd;
+                          const pct=Math.round(qtd/max*100);
+                          return (
+                            <div key={label} style={{marginBottom:10}}>
+                              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                                <span style={{fontFamily:T.sans,fontSize:12,fontWeight:500}}>{label}</span>
+                                <span style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{qtd} visitas</span>
+                              </div>
+                              <div style={{height:5,background:T.g100,borderRadius:2}}>
+                                <div style={{height:"100%",width:pct+"%",background:T.black,borderRadius:2}}/>
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
+
+                    <div>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>Campanha (utm_campaign)</p>
+                      {dash.porUtmCampaign.length===0
+                        ? <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>Nenhuma visita com campanha ainda. Use <code style={{background:T.g100,padding:"2px 5px"}}>?utm_campaign=lancamento</code> nos links.</p>
+                        : dash.porUtmCampaign.map(({label,qtd})=>{
+                          const max=dash.porUtmCampaign[0].qtd;
+                          const pct=Math.round(qtd/max*100);
+                          return (
+                            <div key={label} style={{marginBottom:10}}>
+                              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                                <span style={{fontFamily:T.sans,fontSize:12,fontWeight:500}}>{label}</span>
+                                <span style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{qtd} visitas</span>
+                              </div>
+                              <div style={{height:5,background:T.g100,borderRadius:2}}>
+                                <div style={{height:"100%",width:pct+"%",background:T.black,borderRadius:2}}/>
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
                   </div>
 
                 </div>
