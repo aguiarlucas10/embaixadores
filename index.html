@@ -8,7 +8,6 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Questrial&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&display=swap" rel="stylesheet">
@@ -1608,38 +1607,95 @@ function PageAdmin({ user, onLogout }) {
         {tab==="dashboard" && (
           <div className="fade-in">
 
-            {/* Seletor de periodo */}
+            {/* Periodo selector */}
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:32}}>
               {[30,90,180].map(d=>(
                 <button key={d} onClick={()=>setDashPeriodo(d)}
-                  style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",padding:"8px 16px",border:`1px solid ${dashPeriodo===d?T.black:T.g200}`,background:dashPeriodo===d?T.black:"transparent",color:dashPeriodo===d?T.white:T.g400,cursor:"pointer",transition:"all 0.15s"}}>
+                  style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",padding:"8px 16px",
+                    border:`1px solid ${dashPeriodo===d?T.black:T.g200}`,background:dashPeriodo===d?T.black:"transparent",
+                    color:dashPeriodo===d?T.white:T.g400,cursor:"pointer",transition:"all 0.15s"}}>
                   {d}d
                 </button>
               ))}
-              <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:8}}>Últimos {dashPeriodo} dias</span>
-              {!dash&&<span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:16}}>Carregando...</span>}
+              <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:8}}>Ultimos {dashPeriodo} dias</span>
+              {!dash && <span style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginLeft:16}}>Carregando...</span>}
             </div>
 
-            {dash && (() => {
-              const { BarChart,Bar,LineChart,Line,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer,Legend,FunnelChart,Funnel,LabelList,Cell } = Recharts;
-              const fmt2 = v => "R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:0});
+            {dash && (()=>{
+              const fmt2 = v => "R$ "+Math.round(v).toLocaleString("pt-BR");
+
+              // -- SVG Bar Chart helper
+              function BarChartSVG({data, valueKey, labelKey, color="#000", h=180, secondKey, secondColor="#aaa"}) {
+                const max = Math.max(...data.map(d=>d[valueKey]+(secondKey?d[secondKey]:0)), 1);
+                const W=100/data.length;
+                const gap=0.3;
+                const labels = data.length>14 ? data.filter((_,i)=>i%Math.ceil(data.length/10)===0) : data;
+                return (
+                  <svg width="100%" viewBox={`0 0 ${data.length*10} ${h+20}`} preserveAspectRatio="none" style={{display:"block"}}>
+                    {data.map((d,i)=>{
+                      const x = i*10;
+                      const val1 = d[valueKey]||0;
+                      const val2 = secondKey?(d[secondKey]||0):0;
+                      const h1 = (val1/max)*h;
+                      const h2 = (val2/max)*h;
+                      const barW = 10*(1-gap*2);
+                      const barW2 = barW/2-0.5;
+                      return (
+                        <g key={i}>
+                          {secondKey ? (
+                            <>
+                              <rect x={x+10*gap} y={h-h1} width={barW2} height={h1} fill={color}/>
+                              <rect x={x+10*gap+barW2+1} y={h-h2} width={barW2} height={h2} fill={secondColor}/>
+                            </>
+                          ) : (
+                            <rect x={x+10*gap} y={h-h1} width={barW} height={h1} fill={color}/>
+                          )}
+                        </g>
+                      );
+                    })}
+                    {data.map((d,i)=>{
+                      if(!labels.find(l=>l===d)) return null;
+                      return <text key={"l"+i} x={i*10+5} y={h+14} textAnchor="middle" fontSize="5" fill="#999" fontFamily="sans-serif">{d[labelKey]}</text>;
+                    })}
+                  </svg>
+                );
+              }
+
+              // -- SVG Line Chart helper
+              function LineChartSVG({data, keys, colors, labelKey, h=160}) {
+                const maxVal = Math.max(...data.flatMap(d=>keys.map(k=>d[k]||0)),1);
+                const W = data.length>1 ? 100/(data.length-1) : 100;
+                const pts = (k) => data.map((d,i)=>`${i*W},${h-(((d[k]||0)/maxVal)*h)}`).join(" ");
+                const labels = data.length>14 ? data.filter((_,i)=>i%Math.ceil(data.length/10)===0) : data;
+                return (
+                  <svg width="100%" viewBox={`0 0 100 ${h+20}`} preserveAspectRatio="none" style={{display:"block"}}>
+                    <line x1="0" y1={h} x2="100" y2={h} stroke="#eee" strokeWidth="0.5"/>
+                    {keys.map((k,ki)=>(
+                      <polyline key={k} points={pts(k)} fill="none" stroke={colors[ki]} strokeWidth="0.8"/>
+                    ))}
+                    {labels.map((d,i)=>{
+                      const idx = data.indexOf(d);
+                      return <text key={"l"+i} x={idx*W} y={h+14} textAnchor="middle" fontSize="4.5" fill="#999" fontFamily="sans-serif">{d[labelKey]}</text>;
+                    })}
+                  </svg>
+                );
+              }
 
               return (
                 <div>
-
                   {/* KPI cards */}
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:1,border:`1px solid ${T.g200}`,marginBottom:40}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:1,background:T.g200,border:`1px solid ${T.g200}`,marginBottom:48}}>
                     {[
-                      ["Faturamento",    fmt2(dash.totalFat),         "vendas confirmadas no período"],
-                      ["Comissões",      fmt2(dash.totalCom),         "geradas no período"],
-                      ["Pedidos",        dash.totalPed,               "com cupom no período"],
-                      ["Ticket médio",   fmt2(dash.ticketMedio),      "por pedido"],
-                      ["Ativas",         dash.ativas,                 "embaixadoras cadastradas"],
-                      ["Com venda",      dash.comVenda,               "venderam no período"],
-                      ["Visitas LP",     dash.visitasTotal,           "acessos à página"],
-                      ["Conversão",      dash.txConversao+"%",        "visitas → cadastros"],
+                      ["Faturamento",  fmt2(dash.totalFat),       "pedidos pagos no periodo"],
+                      ["Comissoes",    fmt2(dash.totalCom),       "geradas no periodo"],
+                      ["Pedidos",      dash.totalPed,             "com cupom"],
+                      ["Ticket medio", fmt2(dash.ticketMedio),    "por pedido"],
+                      ["Ativas",       dash.ativas,               "embaixadoras"],
+                      ["Com venda",    dash.comVenda,             "venderam no periodo"],
+                      ["Visitas LP",   dash.visitasTotal,         "acessos a pagina"],
+                      ["Conversao",    dash.txConversao+"%",      "visitas para cadastro"],
                     ].map(([label,val,sub])=>(
-                      <div key={label} style={{padding:"20px 24px",borderRight:`1px solid ${T.g200}`,background:T.white}}>
+                      <div key={label} style={{padding:"20px 20px",background:T.white}}>
                         <p style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g400,marginBottom:6}}>{label}</p>
                         <p style={{fontFamily:T.serif,fontSize:28,fontWeight:300,lineHeight:1,marginBottom:4}}>{val}</p>
                         <p style={{fontFamily:T.sans,fontSize:10,color:T.g400,lineHeight:1.4}}>{sub}</p>
@@ -1647,62 +1703,37 @@ function PageAdmin({ user, onLogout }) {
                     ))}
                   </div>
 
-                  {/* Grafico faturamento diario */}
+                  {/* Faturamento diario */}
                   <div style={{marginBottom:48}}>
-                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Faturamento diário</p>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={dash.timeline} margin={{top:0,right:0,left:0,bottom:0}}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={T.g200} vertical={false}/>
-                        <XAxis dataKey="data" tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}
-                          interval={Math.floor(dash.timeline.length/8)}/>
-                        <YAxis tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}
-                          tickFormatter={v=>v===0?"":("R$"+v.toLocaleString("pt-BR",{maximumFractionDigits:0}))}/>
-                        <Tooltip formatter={(v,n)=>["R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2}),n==="fat"?"Faturamento":"Comissão"]}
-                          contentStyle={{fontFamily:T.sans,fontSize:11,border:`1px solid ${T.g200}`,borderRadius:0}}/>
-                        <Bar dataKey="fat" fill={T.black} radius={[2,2,0,0]} maxBarSize={20}/>
-                        <Bar dataKey="comissao" fill={T.g400} radius={[2,2,0,0]} maxBarSize={20}/>
-                      </BarChart>
-                    </ResponsiveContainer>
-                    <div style={{display:"flex",gap:24,marginTop:8}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:10,background:T.black,display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>Faturamento</span></div>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:10,background:T.g400,display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>Comissão</span></div>
-                    </div>
+                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Faturamento diario</p>
+                    <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Pedidos pagos (preto) vs comissao gerada (cinza)</p>
+                    <BarChartSVG data={dash.timeline} valueKey="fat" secondKey="comissao" labelKey="data" color="#000" secondColor="#bbb" h={180}/>
                   </div>
 
-                  {/* Grafico cadastros vs visitas */}
+                  {/* Cadastros e visitas */}
                   <div style={{marginBottom:48}}>
-                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Cadastros e visitas diárias</p>
-                    <ResponsiveContainer width="100%" height={180}>
-                      <LineChart data={dash.timeline} margin={{top:0,right:0,left:0,bottom:0}}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={T.g200} vertical={false}/>
-                        <XAxis dataKey="data" tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}
-                          interval={Math.floor(dash.timeline.length/8)}/>
-                        <YAxis allowDecimals={false} tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}/>
-                        <Tooltip contentStyle={{fontFamily:T.sans,fontSize:11,border:`1px solid ${T.g200}`,borderRadius:0}}/>
-                        <Line type="monotone" dataKey="visitas"   stroke={T.g400} strokeWidth={1.5} dot={false} name="Visitas"/>
-                        <Line type="monotone" dataKey="cadastros" stroke={T.black} strokeWidth={2}   dot={false} name="Cadastros"/>
-                      </LineChart>
-                    </ResponsiveContainer>
-                    <div style={{display:"flex",gap:24,marginTop:8}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:2,background:T.black,display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>Cadastros</span></div>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:2,background:T.g400,display:"inline-block"}}/><span style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>Visitas</span></div>
-                    </div>
+                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Cadastros e visitas diarias</p>
+                    <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Visitas (cinza) vs novos cadastros (preto)</p>
+                    <LineChartSVG data={dash.timeline} keys={["visitas","cadastros"]} colors={["#bbb","#000"]} labelKey="data" h={140}/>
                   </div>
 
-                  {/* Funil + Resgates por mes lado a lado */}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,marginBottom:48}}>
+                  {/* Funil + Resgates */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:48,marginBottom:48}}>
 
-                    {/* Funil de conversao */}
+                    {/* Funil */}
                     <div>
-                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Funil de conversão</p>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Funil de conversao</p>
                       {dash.funil.map((f,i)=>(
-                        <div key={f.etapa} style={{marginBottom:12}}>
-                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                        <div key={f.etapa} style={{marginBottom:16}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                             <span style={{fontFamily:T.sans,fontSize:11,color:T.g500}}>{f.etapa}</span>
-                            <span style={{fontFamily:T.sans,fontSize:11,color:T.black,fontWeight:500}}>{f.valor} <span style={{color:T.g400,fontWeight:400}}>({f.pct}%)</span></span>
+                            <span style={{fontFamily:T.sans,fontSize:11}}>
+                              <strong>{f.valor}</strong>
+                              <span style={{color:T.g400}}> ({f.pct}%)</span>
+                            </span>
                           </div>
-                          <div style={{height:8,background:T.g100,borderRadius:2,overflow:"hidden"}}>
-                            <div style={{height:"100%",width:f.pct+"%",background:i===0?T.black:i===1?"#555":T.g400,transition:"width 0.6s ease"}}/>
+                          <div style={{height:6,background:T.g100,borderRadius:2}}>
+                            <div style={{height:"100%",width:f.pct+"%",background:i===0?"#000":i===1?"#555":"#999",transition:"width 0.6s",borderRadius:2}}/>
                           </div>
                         </div>
                       ))}
@@ -1710,38 +1741,34 @@ function PageAdmin({ user, onLogout }) {
 
                     {/* Resgates por mes */}
                     <div>
-                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Resgates por mês</p>
-                      <ResponsiveContainer width="100%" height={160}>
-                        <BarChart data={dash.resgPorMes} margin={{top:0,right:0,left:0,bottom:0}}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={T.g200} vertical={false}/>
-                          <XAxis dataKey="mes" tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}/>
-                          <YAxis tick={{fontFamily:T.sans,fontSize:9,fill:T.g400}} tickLine={false} axisLine={false}
-                            tickFormatter={v=>v===0?"":("R$"+v.toLocaleString("pt-BR",{maximumFractionDigits:0}))}/>
-                          <Tooltip formatter={(v)=>["R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2}),"Resgates"]}
-                            contentStyle={{fontFamily:T.sans,fontSize:11,border:`1px solid ${T.g200}`,borderRadius:0}}/>
-                          <Bar dataKey="valor" fill={T.black} radius={[2,2,0,0]} maxBarSize={28}/>
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:4}}>Resgates por mes</p>
+                      <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginBottom:16}}>Ultimos 6 meses</p>
+                      <BarChartSVG data={dash.resgPorMes} valueKey="valor" labelKey="mes" color="#000" h={140}/>
+                      <div style={{display:"flex",gap:16,marginTop:8,flexWrap:"wrap"}}>
+                        {dash.resgPorMes.map(r=>(
+                          <div key={r.mes} style={{fontFamily:T.sans,fontSize:10,color:T.g400}}>
+                            {r.mes}: <strong style={{color:T.black}}>R$ {Math.round(r.valor).toLocaleString("pt-BR")}</strong>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
                   {/* Top embaixadoras */}
-                  <div style={{marginBottom:40}}>
-                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Top embaixadoras por faturamento</p>
+                  <div>
+                    <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:20}}>Top embaixadoras — periodo</p>
                     {dash.top10.length===0
-                      ? <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhuma venda registrada no período.</p>
+                      ? <p style={{fontFamily:T.sans,fontSize:13,color:T.g400}}>Nenhuma venda no periodo.</p>
                       : dash.top10.map((r,i)=>(
-                        <div key={r.id} style={{display:"flex",alignItems:"center",gap:16,padding:"12px 0",borderBottom:`1px solid ${T.g100}`}}>
-                          <span style={{fontFamily:T.serif,fontSize:18,fontWeight:300,color:T.g300,width:24,textAlign:"right",flexShrink:0}}>{i+1}</span>
+                        <div key={r.id||i} style={{display:"flex",alignItems:"center",gap:16,padding:"12px 0",borderBottom:`1px solid ${T.g100}`}}>
+                          <span style={{fontFamily:T.serif,fontSize:18,fontWeight:300,color:T.g300,width:20,textAlign:"right",flexShrink:0}}>{i+1}</span>
                           <div style={{flex:1,minWidth:0}}>
                             <p style={{fontFamily:T.sans,fontSize:13,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome}</p>
-                            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{r.peds} pedido{r.peds!==1?"s":""} · {fmt2(r.com)} de comissão</p>
+                            <p style={{fontFamily:T.sans,fontSize:11,color:T.g400}}>{r.peds} pedido{r.peds!==1?"s":""} · {fmt2(r.com)} de comissao</p>
                           </div>
-                          <div style={{textAlign:"right",flexShrink:0}}>
-                            <p style={{fontFamily:T.serif,fontSize:20,fontWeight:300}}>{fmt2(r.fat)}</p>
-                          </div>
-                          <div style={{width:80,flexShrink:0}}>
-                            <div style={{height:4,background:T.g100,borderRadius:2}}>
+                          <p style={{fontFamily:T.serif,fontSize:20,fontWeight:300,flexShrink:0}}>{fmt2(r.fat)}</p>
+                          <div style={{width:64,flexShrink:0}}>
+                            <div style={{height:3,background:T.g100,borderRadius:2}}>
                               <div style={{height:"100%",width:Math.round((r.fat/dash.top10[0].fat)*100)+"%",background:T.black,borderRadius:2}}/>
                             </div>
                           </div>
@@ -1755,6 +1782,7 @@ function PageAdmin({ user, onLogout }) {
             })()}
           </div>
         )}
+
 
         {tab==="embaixadores"&&(
           <div className="fade-in">
