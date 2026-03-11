@@ -634,7 +634,7 @@ function PageCadastro({ onNavigate }) {
       </header>
       <div style={{maxWidth:480,margin:"0 auto",padding:"72px 24px"}} className="stagger">
         <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:32}}>Bem-vindo ao time</p>
-        <h1 style={{fontFamily:T.serif,fontSize:48,fontWeight:300,lineHeight:1.1,marginBottom:32,color:"#fff"}}>Você agora é<br/>Embaixadora<br/><em>Saint Germain.</em></h1>
+        <h1 style={{fontFamily:T.sans,fontSize:48,fontWeight:300,lineHeight:1.1,marginBottom:32,color:"#fff"}}>Você agora é<br/>Embaixadora<br/><em>Saint Germain.</em></h1>
         <div style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",padding:"24px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,marginBottom:40}}>
           <span style={{fontFamily:T.sans,fontSize:9,letterSpacing:"0.18em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)"}}>Seu cupom exclusivo</span>
           <span style={{fontFamily:T.sans,fontSize:30,letterSpacing:"0.25em",color:"#fff"}}>{cupomFinal}</span>
@@ -653,16 +653,16 @@ function PageCadastro({ onNavigate }) {
                   <input className="lp-cadastro-input" type={fi.type} value={fi.val} placeholder={fi.ph}
                     onChange={function(e){fi.set(e.target.value);}}
                     onKeyDown={i===1?function(e){if(e.key==="Enter")criarContaEAcessar();}:undefined}
-                    style={{fontFamily:T.sans,fontSize:15,border:"none",borderBottom:"1px solid rgba(255,255,255,0.18)",padding:"10px 0",background:"transparent",color:"#fff",width:"100%",borderRadius:0}}/>
+                    style={{fontFamily:T.sans,fontSize:15,border:"none",borderBottom:"1px solid #000",padding:"10px 0",background:"transparent",color:T.black,width:"100%",borderRadius:0}}/>
                 </div>
               );
             })}
           </div>
-          {err && <div style={{marginBottom:24,padding:"12px 16px",border:"1px solid rgba(255,60,60,0.3)"}}><p style={{fontFamily:T.sans,fontSize:12,color:"#ff6b6b"}}>{err}</p></div>}
+          {err && <div style={{marginBottom:24,padding:"12px 16px",border:"1px solid rgba(255,60,60,0.3)"}}><p style={{fontFamily:T.sans,fontSize:12,color:"#c00"}}>{err}</p></div>}
           <button onClick={criarContaEAcessar} disabled={loadingAcesso}
             style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"18px 32px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loadingAcesso?0.7:1}}>
             {loadingAcesso
-              ? <span style={{width:14,height:14,border:"1.5px solid #000",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>
+              ? <span style={{width:14,height:14,border:"1.5px solid #fff",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>
               : "Acessar meu painel"}
           </button>
         </div>
@@ -679,7 +679,7 @@ function PageCadastro({ onNavigate }) {
       </header>
       <div style={{maxWidth:520,margin:"0 auto",padding:"72px 24px"}} className="stagger">
         <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)",marginBottom:12}}>Quase lá</p>
-        <h1 style={{fontFamily:T.serif,fontSize:42,fontWeight:300,lineHeight:1.1,marginBottom:12,color:"#fff"}}>Escolha seu<br/><em>cupom exclusivo.</em></h1>
+        <h1 style={{fontFamily:T.sans,fontSize:42,fontWeight:300,lineHeight:1.1,marginBottom:12,color:"#fff"}}>Escolha seu<br/><em>cupom exclusivo.</em></h1>
         <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.4)",lineHeight:1.8,marginBottom:40}}>Este será o código que seus seguidores usam para ganhar desconto — e você ganha comissão em cada venda.</p>
 
         <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:40}}>
@@ -702,7 +702,7 @@ function PageCadastro({ onNavigate }) {
           })}
         </div>
 
-        {err && <div style={{marginBottom:24,padding:"12px 16px",border:"1px solid rgba(255,60,60,0.3)"}}><p style={{fontFamily:T.sans,fontSize:12,color:"#ff6b6b"}}>{err}</p></div>}
+        {err && <div style={{marginBottom:24,padding:"12px 16px",border:"1px solid rgba(255,60,60,0.3)"}}><p style={{fontFamily:T.sans,fontSize:12,color:"#c00"}}>{err}</p></div>}
 
         <button onClick={finalizar} disabled={loadingFinalizar}
           style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"18px 32px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loadingFinalizar?0.7:1}}>
@@ -745,7 +745,7 @@ function PageCadastro({ onNavigate }) {
         {/* Hero content */}
         <div style={{position:"relative",zIndex:3,maxWidth:1100,margin:"0 auto",padding:"0 32px",width:"100%"}}>
           <p className="lp-hero-sub" style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.28em",textTransform:"uppercase",color:"rgba(255,255,255,0.5)",marginBottom:14}}>Programa Exclusivo</p>
-          <h1 className="lp-hero-title" style={{fontFamily:T.serif,fontWeight:400,fontSize:"clamp(34px,5.5vw,68px)",color:"#fff",lineHeight:1.05,marginBottom:20}}>
+          <h1 className="lp-hero-title" style={{fontFamily:T.sans,fontWeight:400,fontSize:"clamp(34px,5.5vw,68px)",color:"#fff",lineHeight:1.05,marginBottom:20}}>
             Clientes<br/><em style={{fontStyle:"italic",color:"rgba(255,255,255,0.7)"}}>Embaixadores</em><br/>Saint Germain.
           </h1>
           <p className="lp-hero-sub" style={{fontFamily:T.sans,fontSize:"clamp(12px,1.4vw,14px)",color:"rgba(255,255,255,0.5)",lineHeight:1.8,maxWidth:420,marginBottom:32}}>
@@ -783,7 +783,7 @@ function PageCadastro({ onNavigate }) {
           </div>
           {/* Copy text */}
           <div style={{maxWidth:560,margin:"0 auto"}}>
-            <h2 style={{fontFamily:T.serif,fontSize:"clamp(26px,3.5vw,40px)",fontWeight:400,lineHeight:1.2,marginBottom:24,textAlign:"center"}}>
+            <h2 style={{fontFamily:T.sans,fontSize:"clamp(26px,3.5vw,40px)",fontWeight:400,lineHeight:1.2,marginBottom:24,textAlign:"center"}}>
               O que muda quando<br/><em>você entra.</em>
             </h2>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -795,7 +795,7 @@ function PageCadastro({ onNavigate }) {
               ].map(function(line,i){
                 return (
                   <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12}}>
-                    <span style={{fontFamily:T.serif,fontSize:18,color:"#c8b89a",flexShrink:0,lineHeight:1.6}}>-</span>
+                    <span style={{fontFamily:T.sans,fontSize:18,color:"#c8b89a",flexShrink:0,lineHeight:1.6}}>-</span>
                     <p style={{fontFamily:T.sans,fontSize:14,color:T.g600,lineHeight:1.8}}>{line}</p>
                   </div>
                 );
@@ -825,7 +825,7 @@ function PageCadastro({ onNavigate }) {
       {/* CALLOUT STRIP */}
       <section style={{background:"#000",padding:"72px 24px",textAlign:"center"}}>
         <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:12}}>Exclusivo para clientes</p>
-        <h2 style={{fontFamily:T.serif,fontSize:"clamp(28px,4vw,48px)",fontWeight:300,color:"#fff",lineHeight:1.2,marginBottom:28}}>
+        <h2 style={{fontFamily:T.sans,fontSize:"clamp(28px,4vw,48px)",fontWeight:300,color:"#fff",lineHeight:1.2,marginBottom:28}}>
           Não é preciso ter seguidores.<br/><em>Só precisa amar a Saint Germain.</em>
         </h2>
         <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.45)",lineHeight:1.8,maxWidth:480,margin:"0 auto 36px"}}>
@@ -838,17 +838,18 @@ function PageCadastro({ onNavigate }) {
       </section>
 
       {/* FORM SECTION */}
-      <section id="sg-form-section" style={{background:"#0a0a0a",padding:"80px 24px 100px"}}>
+      <section id="sg-form-section" style={{background:"#fff",padding:"80px 24px 100px"}}>
         <div style={{maxWidth:560,margin:"0 auto"}}>
-          <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)",marginBottom:8,textAlign:"center"}}>Programa Embaixadoras</p>
-          <h2 style={{fontFamily:T.serif,fontSize:"clamp(32px,5vw,52px)",fontWeight:400,color:"#fff",lineHeight:1.1,textAlign:"center",marginBottom:12}}>
+          <p style={{fontFamily:T.sans,fontSize:11,letterSpacing:"0.22em",textTransform:"uppercase",color:T.g400,marginBottom:8,textAlign:"center"}}>Programa Embaixadoras</p>
+          <h2 style={{fontFamily:T.sans,fontSize:"clamp(32px,5vw,52px)",fontWeight:400,color:T.black,lineHeight:1.1,textAlign:"center",marginBottom:12}}>
             Pronta para<br/><em>entrar no time?</em>
           </h2>
-          <p style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.4)",textAlign:"center",lineHeight:1.8,marginBottom:48}}>
+          <p style={{fontFamily:T.sans,fontSize:13,color:T.g400,textAlign:"center",lineHeight:1.8,marginBottom:48}}>
             Preencha os dados abaixo. Verificamos automaticamente se você é cliente da Saint Germain.
           </p>
 
           {/* FORM */}
+          <div style={{border:"1px solid #000",padding:"40px 40px 36px",background:"#fff",marginBottom:0}}>
           <div style={{display:"flex",flexDirection:"column",gap:28,marginBottom:36}}>
             {[
               {label:"Nome completo *",key:"nome",type:"text",ph:""},
@@ -860,9 +861,9 @@ function PageCadastro({ onNavigate }) {
             ].map(function(field){
               return (
                 <div key={field.key} style={{display:"flex",flexDirection:"column",gap:6}}>
-                  <label style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:"rgba(255,255,255,0.4)"}}>{field.label}</label>
+                  <label style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",color:T.g500}}>{field.label}</label>
                   <input className="lp-cadastro-input" type={field.type} value={f[field.key]} onChange={function(e){set(field.key,e.target.value);}} placeholder={field.ph}
-                    style={{fontFamily:T.sans,fontSize:15,border:"none",borderBottom:"1px solid rgba(255,255,255,0.18)",padding:"10px 0",background:"transparent",color:"#fff",width:"100%",borderRadius:0,transition:"border-bottom 0.15s"}}/>
+                    style={{fontFamily:T.sans,fontSize:15,border:"none",borderBottom:"1px solid #000",padding:"10px 0",background:"transparent",color:T.black,width:"100%",borderRadius:0,transition:"border-bottom 0.15s"}}/>
                 </div>
               );
             })}
@@ -870,27 +871,28 @@ function PageCadastro({ onNavigate }) {
 
           <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:36}}>
             <input type="checkbox" id="aceite-lp" checked={aceite} onChange={function(e){setAceite(e.target.checked);}}
-              style={{width:14,height:14,marginTop:2,cursor:"pointer",flexShrink:0,accentColor:"#fff"}}/>
-            <label htmlFor="aceite-lp" style={{fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.4)",lineHeight:1.7,cursor:"pointer"}}>
+              style={{width:14,height:14,marginTop:2,cursor:"pointer",flexShrink:0,accentColor:"#000"}}/>
+            <label htmlFor="aceite-lp" style={{fontFamily:T.sans,fontSize:11,color:T.g500,lineHeight:1.7,cursor:"pointer"}}>
               Aceito os termos do programa e autorizo o uso da minha imagem em publicações relacionadas ao programa Clientes Embaixadores da Saint Germain.
             </label>
           </div>
 
-          {err && <div style={{marginBottom:24,padding:"12px 16px",border:"1px solid rgba(255,60,60,0.3)",background:"rgba(255,40,40,0.08)"}}><p style={{fontFamily:T.sans,fontSize:12,color:"#ff6b6b"}}>{err}</p></div>}
+          {err && <div style={{marginBottom:24,padding:"12px 16px",border:"1px solid #f99",background:"#fff5f5"}}><p style={{fontFamily:T.sans,fontSize:12,color:"#c00"}}>{err}</p></div>}
 
           <button onClick={avancarParaCupom} disabled={loading}
-            style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.22em",textTransform:"uppercase",background:"#fff",color:"#000",border:"none",padding:"18px 32px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1}}>
+            style={{fontFamily:T.sans,fontSize:12,letterSpacing:"0.22em",textTransform:"uppercase",background:"#000",color:"#fff",border:"none",padding:"18px 32px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1}}>
             {loading
               ? <span style={{width:14,height:14,border:"1.5px solid #000",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>
               : "Continuar"}
           </button>
 
-          <p style={{fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.28)",marginTop:20,textAlign:"center"}}>
+          <p style={{fontFamily:T.sans,fontSize:11,color:T.g400,marginTop:20,textAlign:"center"}}>
             Já é embaixadora?{" "}
-            <button onClick={function(){onNavigate("login");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.55)",textDecoration:"underline"}}>
+            <button onClick={function(){onNavigate("login");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:T.sans,fontSize:11,color:T.g600,textDecoration:"underline"}}>
               Acesse seu painel
             </button>
           </p>
+        </div>{/* end form border box */}
         </div>
       </section>
 
@@ -927,7 +929,7 @@ function PageCadastro({ onNavigate }) {
               ].map(function(r,i){
                 return (
                   <div key={i} style={{display:"flex",gap:14,paddingBottom:20,borderBottom:i<2?"1px solid rgba(255,255,255,0.05)":"none"}}>
-                    <span style={{fontFamily:T.serif,fontSize:13,color:"rgba(255,255,255,0.15)",flexShrink:0,marginTop:1}}>0{i+1}</span>
+                    <span style={{fontFamily:T.sans,fontSize:13,color:"rgba(255,255,255,0.15)",flexShrink:0,marginTop:1}}>0{i+1}</span>
                     <div>
                       <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:"rgba(255,255,255,0.35)",marginBottom:5}}>{r.titulo}</p>
                       <p style={{fontFamily:T.sans,fontSize:11,color:"rgba(255,255,255,0.22)",lineHeight:1.8}}>{r.texto}</p>
