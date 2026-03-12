@@ -32,11 +32,14 @@
 const CONFIG = {
   SUPABASE_URL:      "https://fsfqnshkfwnfeswwdmxg.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnFuc2hrZnduZmVzd3dkbXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MzcxNDAsImV4cCI6MjA4ODMxMzE0MH0.XO5JpNdnu03tRLGUsisi3I_lTZHcMwhJMlw9VBrXkK8",
-  NUVEMSHOP_USER_ID: "1116055",
-  NUVEMSHOP_TOKEN:   "803dbce287de76eb31d88c26c30e60c72126bb22",
-  COMISSAO_PCT:      0.10,
-  DESCONTO_PCT:      0.10,
-  ADMIN_EMAILS:      ["adminsg@saintgermain.com.br"],
+
+  // Tokens de API de terceiros (Nuvemshop, Meta) ficam APENAS no servidor
+  // (variáveis de ambiente da Edge Function bright-api).
+  // O front NUNCA acessa essas APIs diretamente.
+
+  COMISSAO_PCT:  0.10,
+  DESCONTO_PCT:  0.10,
+  ADMIN_EMAILS:  ["adminsg@saintgermain.com.br"],
 };
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -547,7 +550,7 @@ function PageAdmin({user,onLogout}){
     return [...base].sort((a,b)=>{
       if(ordemEmb==="nome")return(a.nome||"").localeCompare(b.nome||"","pt");
       if(ordemEmb==="faturamento"){const fa=(a.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0),fb=(b.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0);return fb-fa;}
-      if(ordemEmb==="disponivel"){const da=(a.comissoes_sg||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0),db=(b.comissoes_sg||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);return db-da;}
+      if(ordemEmb==="disponivel"){const da=(a.comissoes_sg||[]).filter(c=>(c.payment_status==="paid"||c.status==="confirmada")&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0),db=(b.comissoes_sg||[]).filter(c=>(c.payment_status==="paid"||c.status==="confirmada")&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);return db-da;}
       return new Date(b.criado_em||0)-new Date(a.criado_em||0);
     });
   },[embs,busca,ordemEmb]);
@@ -692,7 +695,7 @@ function PageAdmin({user,onLogout}){
     const header=["Nome","E-mail","WhatsApp","Instagram","Cupom","Status","Faturamento","Disponivel"];
     const rows=filtrados.map(e=>{
       const fat=(e.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0).toFixed(2).replace(".",",");
-      const disp=(e.comissoes_sg||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0).toFixed(2).replace(".",",");
+      const disp=(e.comissoes_sg||[]).filter(c=>(c.payment_status==="paid"||c.status==="confirmada")&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0).toFixed(2).replace(".",",");
       return[e.nome,e.email,e.whatsapp||"",e.instagram||"",e.cupom,e.status||"",fat,disp].join(sep);
     });
     const csv=BOM+[header.join(sep),...rows].join("\n");
@@ -867,7 +870,7 @@ function PageAdmin({user,onLogout}){
                 </tr></thead>
                 <tbody>{filtrados.map((e,i)=>{
                   const fat=(e.comissoes_sg||[]).reduce((s,c)=>s+(c.valor_comissao||0),0);
-                  const disp=(e.comissoes_sg||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
+                  const disp=(e.comissoes_sg||[]).filter(c=>(c.payment_status==="paid"||c.status==="confirmada")&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
                   return(
                     <tr key={e.id} style={{borderBottom:`1px solid ${T.g100}`,background:i%2===0?"transparent":"#fafafa",transition:"background 0.1s"}}>
                       <td style={{padding:"12px 12px"}}>
@@ -1239,20 +1242,19 @@ function PageChat({ embs, onUnread }) {
     const fone = ativa.telefone;
     try {
       const res = await fetch(
-        "https://graph.facebook.com/v19.0/" + CONFIG.META_PHONE_ID + "/messages",
+        `${CONFIG.SUPABASE_URL}/functions/v1/bright-api`,
         {
           method: "POST",
-          headers: {"Content-Type":"application/json", Authorization:"Bearer "+CONFIG.META_TOKEN},
+          headers: {"Content-Type":"application/json", Authorization:"Bearer "+CONFIG.SUPABASE_ANON_KEY},
           body: JSON.stringify({
-            messaging_product: "whatsapp",
+            action: "wa_send_text",
             to: fone,
-            type: "text",
-            text: { body: texto }
+            text: texto
           })
         }
       );
       const data = await res.json();
-      if(data.error) throw new Error(data.error.message);
+      if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
       // Save sent message to DB
       await supabase.from("mensagens_whatsapp").insert({
@@ -1678,8 +1680,8 @@ function PageWhatsApp({ embs }) {
     setLoadingTpl(true); setTplError("");
     try {
       const res = await fetch(
-        "https://graph.facebook.com/v19.0/" + CONFIG.META_WABA_ID + "/message_templates?fields=name,status,language,components&limit=50",
-        { headers: { Authorization: "Bearer " + CONFIG.META_TOKEN } }
+        `${CONFIG.SUPABASE_URL}/functions/v1/bright-api?action=wa_templates`,
+        { headers: { Authorization: "Bearer " + CONFIG.SUPABASE_ANON_KEY } }
       );
       const data = await res.json();
       if(data.error) { setTplError(data.error.message); setLoadingTpl(false); return; }
@@ -1758,19 +1760,16 @@ function PageWhatsApp({ embs }) {
       if(!fone) { setSendLog(function(l){ return [...l, {nome:emb.nome,ok:false,msg:"Sem WhatsApp"}]; }); continue; }
       try {
         const res = await fetch(
-          "https://graph.facebook.com/v19.0/" + CONFIG.META_PHONE_ID + "/messages",
+          `${CONFIG.SUPABASE_URL}/functions/v1/bright-api`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + CONFIG.META_TOKEN },
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + CONFIG.SUPABASE_ANON_KEY },
             body: JSON.stringify({
-              messaging_product: "whatsapp",
+              action: "wa_send_template",
               to: fone.startsWith("55") ? fone : "55" + fone,
-              type: "template",
-              template: {
-                name: selectedTpl.name,
-                language: { code: selectedTpl.language },
-                components: buildComponents(selectedTpl, emb)
-              }
+              template_name: selectedTpl.name,
+              template_language: selectedTpl.language,
+              components: buildComponents(selectedTpl, emb)
             })
           }
         );

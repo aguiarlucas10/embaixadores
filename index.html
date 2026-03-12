@@ -76,19 +76,17 @@
 
 // -- CONFIG ------------------------------------------------------------------
 const CONFIG = {
-  SUPABASE_URL:        "https://fsfqnshkfwnfeswwdmxg.supabase.co",
-  SUPABASE_ANON_KEY:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnFuc2hrZnduZmVzd3dkbXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MzcxNDAsImV4cCI6MjA4ODMxMzE0MH0.XO5JpNdnu03tRLGUsisi3I_lTZHcMwhJMlw9VBrXkK8",
-  NUVEMSHOP_USER_ID:   "1116055",
-  NUVEMSHOP_TOKEN:     "803dbce287de76eb31d88c26c30e60c72126bb22",
-  META_PHONE_ID:       "834599116401983",
-  META_WABA_ID:        "1503530614291780",
-  META_TOKEN:          "EAA8IELAR7LUBQzhJWDGJN36DJVju4w29Nu1ilYqNSFgOLTDYk2gKwX90HnEc5xsauZCMPZB7WgmAi6joKXcT2ZB9BdXOuiD4I6DJ8CcwYTrsfIfmajC8GxhjgaGkCE8XcPIYJZCF9JziKZBuZCZCWPvRlTvdkXeASK0JdTyH57qIvfFJLXbZBPYwPEalKk4EFp59bgZDZD",
-  
-  COMISSAO_PCT:           0.10,
-  DESCONTO_PCT:           0.10,
-  JANELA_DEVOLUCAO:       7,
-  ADMIN_EMAILS:           ["adminsg@saintgermain.com.br"],
+  SUPABASE_URL:      "https://fsfqnshkfwnfeswwdmxg.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnFuc2hrZnduZmVzd3dkbXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MzcxNDAsImV4cCI6MjA4ODMxMzE0MH0.XO5JpNdnu03tRLGUsisi3I_lTZHcMwhJMlw9VBrXkK8",
 
+  // Tokens de API de terceiros (Nuvemshop, Meta) ficam APENAS no servidor
+  // (variáveis de ambiente da Edge Function bright-api).
+  // O front NUNCA acessa essas APIs diretamente.
+
+  COMISSAO_PCT:    0.10,
+  DESCONTO_PCT:    0.10,
+  JANELA_DEVOLUCAO: 7,
+  ADMIN_EMAILS:    ["adminsg@saintgermain.com.br"],
 };
 
 const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -1460,6 +1458,8 @@ function PageAdmin({ user, onLogout }) {
   const [grupoLinkAdmin, setGrupoLinkAdmin] = React.useState("");
   const [salvandoGrupo, setSalvandoGrupo] = React.useState(false);
   const [msgGrupo, setMsgGrupo] = React.useState({text:"",ok:false});
+  const [syncAdmin, setSyncAdmin] = React.useState(false);
+  const [syncLog, setSyncLog] = React.useState({total:0,novas:0,erros:0,atual:""});
 
   React.useEffect(()=>{load();},[]);
 
@@ -1486,6 +1486,49 @@ function PageAdmin({ user, onLogout }) {
     if(ba?.valor) setBannerAltura(Number(ba.valor));
     const {data:gl} = await supabase.from("config").select("valor").eq("chave","grupo_vip_link").maybeSingle();
     if(gl?.valor) setGrupoLinkAdmin(gl.valor);
+  }
+
+  async function sincronizarTodos() {
+    if(syncAdmin==="running") return;
+    setSyncAdmin("running");
+    setSyncLog({total:0,novas:0,erros:0,atual:"Carregando embaixadores..."});
+    try {
+      const {data:todos} = await supabase.from("embaixadores").select("id,cupom,nome").eq("status","ativo");
+      const lista = (todos||[]).filter(e=>e.cupom);
+      setSyncLog(l=>({...l,total:lista.length,atual:"Iniciando..."}));
+      let novas=0, erros=0;
+      for(let i=0;i<lista.length;i++){
+        const emb = lista[i];
+        setSyncLog(l=>({...l,atual:`(${i+1}/${lista.length}) ${emb.nome||emb.cupom}`}));
+        try {
+          const pedidos = await NS.ordersByCoupon(emb.cupom);
+          for(const p of (pedidos||[])){
+            const usouCupom = (p.coupon||[]).some(function(cp){
+              return String(cp.code||"").toUpperCase()===String(emb.cupom).toUpperCase();
+            });
+            if(!usouCupom) continue;
+            if(p.payment_status==="voided"||p.payment_status==="refunded") continue;
+            const {data:ex} = await supabase.from("comissoes").select("id").eq("pedido_id",String(p.id)).maybeSingle();
+            if(ex) continue;
+            const val = parseFloat(p.total);
+            const status = p.payment_status==="paid" ? (diasPassados(p.created_at,CONFIG.JANELA_DEVOLUCAO)?"confirmada":"pendente") : "pendente";
+            const {error} = await supabase.from("comissoes").insert({
+              embaixador_id:emb.id, pedido_id:String(p.id),
+              valor_pedido:val, valor_comissao:val*CONFIG.COMISSAO_PCT,
+              status, payment_status:p.payment_status, criado_em:p.created_at
+            });
+            if(!error) novas++;
+          }
+        } catch(e){ erros++; }
+        setSyncLog(l=>({...l,novas,erros}));
+        // pequena pausa para não estourar rate limit da Nuvemshop
+        await new Promise(r=>setTimeout(r,300));
+      }
+      setSyncLog(l=>({...l,atual:"Concluido!"}));
+    } catch(e){ setSyncLog(l=>({...l,atual:"Erro: "+String(e)})); }
+    setSyncAdmin("done");
+    if(dashModo==="preset") loadDashboard(dashPeriodo,null,null);
+    else if(dashCustomDe&&dashCustomAte) loadDashboard(null,dashCustomDe,dashCustomAte);
   }
 
   async function aprovar(id){await supabase.from("resgates").update({status:"aprovado"}).eq("id",id);await load();}
@@ -1770,8 +1813,8 @@ function PageAdmin({ user, onLogout }) {
         return fb-fa;
       }
       if(ordemEmb==="disponivel"){
-        const da=(a.comissoes||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
-        const db=(b.comissoes||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
+        const da=(a.comissoes||[]).filter(c=>(c.payment_status==="paid"||c.status==="confirmada")&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
+        const db=(b.comissoes||[]).filter(c=>(c.payment_status==="paid"||c.status==="confirmada")&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
         return db-da;
       }
       return new Date(b.criado_em||0)-new Date(a.criado_em||0);
@@ -1791,6 +1834,31 @@ function PageAdmin({ user, onLogout }) {
         </div>
 
         <StatGrid items={[[embs.filter(e=>e.status==="ativo").length,"Ativos"],[ress.length,"Resgates pendentes"],[fila.length,"Fila de contato"]]} cols={3}/>
+
+        {/* Sincronizar vendas — fora do Tabs para garantir visibilidade */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px",marginBottom:32,border:"1px solid #000",background:"#000"}}>
+          <div>
+            <p style={{fontFamily:"Questrial,sans-serif",fontSize:11,fontWeight:500,color:"#fff",marginBottom:2}}>Sincronizar vendas</p>
+            <p style={{fontFamily:"Questrial,sans-serif",fontSize:11,color:"rgba(255,255,255,0.5)",margin:0}}>
+              {syncAdmin==="running"
+                ? syncLog.atual+" — "+syncLog.novas+" novas ("+syncLog.erros+" erros)"
+                : syncAdmin==="done"
+                ? "✓ Concluido: "+syncLog.novas+" novas comissoes em "+syncLog.total+" embaixadores"
+                : "Importa pedidos pagos da Nuvemshop para todos os embaixadores ativos"}
+            </p>
+          </div>
+          <button onClick={sincronizarTodos} disabled={syncAdmin==="running"}
+            style={{fontFamily:"Questrial,sans-serif",fontSize:10,letterSpacing:"0.15em",textTransform:"uppercase",
+              padding:"10px 28px",border:"1px solid rgba(255,255,255,0.4)",
+              background:"transparent",color:"#fff",
+              cursor:syncAdmin==="running"?"not-allowed":"pointer",
+              whiteSpace:"nowrap",flexShrink:0,display:"flex",alignItems:"center",gap:8,
+              opacity:syncAdmin==="running"?0.5:1}}>
+            {syncAdmin==="running"
+              ? <><span style={{width:10,height:10,border:"1.5px solid #fff",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/> Sincronizando...</>
+              : "Sincronizar agora"}
+          </button>
+        </div>
 
         <Tabs tabs={["dashboard","embaixadores","resgates","financeiro","fila","ranking","banner","whatsapp","chat","importar","estreia"]} labels={{dashboard:"Dashboard",embaixadores:"Embaixadores ("+embs.length+")",resgates:"Resgates"+(ress.length?" ("+ress.length+")":""),financeiro:"Financeiro",fila:"Fila"+(fila.length?" ("+fila.length+")":""),ranking:"Ranking",banner:"Banner",whatsapp:"WhatsApp",chat:"Chat"+(unread?" ("+unread+")":""),importar:"Importar",estreia:"Pre-estreia"}} active={tab} onChange={setTab}>
 
@@ -2450,7 +2518,7 @@ function PageAdmin({ user, onLogout }) {
                     <tbody>
                       {filtrados.map((e,i)=>{
                         const total=(e.comissoes||[]).reduce((s,c)=>s+(c.valor_comissao||0),0);
-                        const saldo=(e.comissoes||[]).filter(c=>c.status==="confirmada"&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
+                        const saldo=(e.comissoes||[]).filter(c=>(c.payment_status==="paid"||c.status==="confirmada")&&!c.resgatada).reduce((s,c)=>s+(c.valor_comissao||0),0);
                         const statusColor={ativo:"#2a9d5c",inativo:T.g400,pendente:"#e8a020"}[e.status]||T.g400;
                         return (
                           <tr key={e.id} style={{borderBottom:`1px solid ${T.g100}`,background:i%2===0?"transparent":"#fafafa",transition:"background 0.1s"}}
@@ -2887,20 +2955,19 @@ function PageChat({ embs, onUnread }) {
     const fone = ativa.telefone;
     try {
       const res = await fetch(
-        "https://graph.facebook.com/v19.0/" + CONFIG.META_PHONE_ID + "/messages",
+        `${CONFIG.SUPABASE_URL}/functions/v1/bright-api`,
         {
           method: "POST",
-          headers: {"Content-Type":"application/json", Authorization:"Bearer "+CONFIG.META_TOKEN},
+          headers: {"Content-Type":"application/json", Authorization:"Bearer "+CONFIG.SUPABASE_ANON_KEY},
           body: JSON.stringify({
-            messaging_product: "whatsapp",
+            action: "wa_send_text",
             to: fone,
-            type: "text",
-            text: { body: texto }
+            text: texto
           })
         }
       );
       const data = await res.json();
-      if(data.error) throw new Error(data.error.message);
+      if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
       // Save sent message to DB
       await supabase.from("mensagens_whatsapp").insert({
@@ -3540,11 +3607,11 @@ function PageWhatsApp({ embs }) {
     setLoadingTpl(true); setTplError("");
     try {
       const res = await fetch(
-        "https://graph.facebook.com/v19.0/" + CONFIG.META_WABA_ID + "/message_templates?fields=name,status,language,components&limit=50",
-        { headers: { Authorization: "Bearer " + CONFIG.META_TOKEN } }
+        `${CONFIG.SUPABASE_URL}/functions/v1/bright-api?action=wa_templates`,
+        { headers: { Authorization: "Bearer " + CONFIG.SUPABASE_ANON_KEY } }
       );
       const data = await res.json();
-      if(data.error) { setTplError(data.error.message); setLoadingTpl(false); return; }
+      if(data.error) { setTplError(data.error.message || JSON.stringify(data.error)); setLoadingTpl(false); return; }
       const aprovados = (data.data || []).filter(function(t) { return t.status === "APPROVED"; });
       setTemplates(aprovados);
     } catch(e) { setTplError("Erro ao carregar templates: " + e.message); }
@@ -3620,24 +3687,21 @@ function PageWhatsApp({ embs }) {
       if(!fone) { setSendLog(function(l){ return [...l, {nome:emb.nome,ok:false,msg:"Sem WhatsApp"}]; }); continue; }
       try {
         const res = await fetch(
-          "https://graph.facebook.com/v19.0/" + CONFIG.META_PHONE_ID + "/messages",
+          `${CONFIG.SUPABASE_URL}/functions/v1/bright-api`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + CONFIG.META_TOKEN },
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + CONFIG.SUPABASE_ANON_KEY },
             body: JSON.stringify({
-              messaging_product: "whatsapp",
+              action: "wa_send_template",
               to: fone.startsWith("55") ? fone : "55" + fone,
-              type: "template",
-              template: {
-                name: selectedTpl.name,
-                language: { code: selectedTpl.language },
-                components: buildComponents(selectedTpl, emb)
-              }
+              template_name: selectedTpl.name,
+              template_language: selectedTpl.language,
+              components: buildComponents(selectedTpl, emb)
             })
           }
         );
         const data = await res.json();
-        if(data.error) throw new Error(data.error.message);
+        if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
         setSendLog(function(l){ return [...l, {nome:emb.nome,ok:true,msg:"Enviado"}]; });
         if(emb._estreia) {
           await supabase.from("pre_estreia").update({disparos: (emb.disparos||0)+1}).eq("id", emb.id);
