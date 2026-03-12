@@ -112,6 +112,13 @@ const NS = {
     } catch { return []; }
   },
 
+  async ordersSince(since) {
+    try {
+      const r = await fetch(`${this.proxy}?action=orders_since&since=${encodeURIComponent(since)}`, { headers: this.h });
+      return r.ok ? r.json() : [];
+    } catch { return []; }
+  },
+
   async createCoupon(code) {
     try {
       const r = await fetch(`${this.proxy}?action=create_coupon`, {
@@ -1491,39 +1498,61 @@ function PageAdmin({ user, onLogout }) {
   async function sincronizarTodos() {
     if(syncAdmin==="running") return;
     setSyncAdmin("running");
-    setSyncLog({total:0,novas:0,erros:0,atual:"Carregando embaixadores..."});
+    setSyncLog({total:0,novas:0,erros:0,atual:"Buscando pedidos..."});
     try {
-      const {data:todos} = await supabase.from("embaixadores").select("id,cupom,nome").eq("status","ativo");
-      const lista = (todos||[]).filter(e=>e.cupom);
-      setSyncLog(l=>({...l,total:lista.length,atual:"Iniciando..."}));
+      // 1. Descobrir data de inicio: ultima_sync salva no banco, ou 2026-03-09 como minimo
+      const DATA_MINIMA = "2026-03-09T00:00:00-03:00";
+      const {data:cfgSync} = await supabase.from("config").select("valor").eq("chave","ultima_sync").maybeSingle();
+      const since = cfgSync?.valor && cfgSync.valor > DATA_MINIMA ? cfgSync.valor : DATA_MINIMA;
+
+      setSyncLog(l=>({...l,atual:"Buscando pedidos desde "+since.slice(0,10)+"..."}));
+
+      // 2. Uma unica chamada: todos os pedidos pagos desde a data, filtrados pelo prefixo SGB na Edge Function
+      const pedidos = await NS.ordersSince(since);
+      setSyncLog(l=>({...l,total:pedidos.length,atual:"Processando "+pedidos.length+" pedidos..."}));
+
+      if(!pedidos.length){
+        setSyncLog(l=>({...l,atual:"Nenhum pedido novo encontrado."}));
+        setSyncAdmin("done");
+        return;
+      }
+
+      // 3. Carregar mapa de cupom -> embaixador (so cupons SGB ativos)
+      const {data:embs} = await supabase.from("embaixadores").select("id,cupom").eq("status","ativo");
+      const cupomMap = {};
+      (embs||[]).forEach(e=>{ if(e.cupom) cupomMap[e.cupom.toUpperCase()] = e.id; });
+
+      // 4. Processar cada pedido
       let novas=0, erros=0;
-      for(let i=0;i<lista.length;i++){
-        const emb = lista[i];
-        setSyncLog(l=>({...l,atual:`(${i+1}/${lista.length}) ${emb.nome||emb.cupom}`}));
+      for(let i=0; i<pedidos.length; i++){
+        const p = pedidos[i];
+        setSyncLog(l=>({...l,atual:`(${i+1}/${pedidos.length}) Pedido #${p.id}`}));
         try {
-          const pedidos = await NS.ordersByCoupon(emb.cupom);
-          for(const p of (pedidos||[])){
-            const usouCupom = (p.coupon||[]).some(function(cp){
-              return String(cp.code||"").toUpperCase()===String(emb.cupom).toUpperCase();
-            });
-            if(!usouCupom) continue;
-            if(p.payment_status==="voided"||p.payment_status==="refunded") continue;
-            const {data:ex} = await supabase.from("comissoes").select("id").eq("pedido_id",String(p.id)).maybeSingle();
-            if(ex) continue;
-            const val = parseFloat(p.total);
-            const status = p.payment_status==="paid" ? (diasPassados(p.created_at,CONFIG.JANELA_DEVOLUCAO)?"confirmada":"pendente") : "pendente";
-            const {error} = await supabase.from("comissoes").insert({
-              embaixador_id:emb.id, pedido_id:String(p.id),
-              valor_pedido:val, valor_comissao:val*CONFIG.COMISSAO_PCT,
-              status, payment_status:p.payment_status, criado_em:p.created_at
-            });
-            if(!error) novas++;
-          }
+          // Encontrar qual cupom SGB foi usado
+          const cupomUsado = (p.coupon||[]).map(c=>String(c.code||"").toUpperCase()).find(c=>c.startsWith("SGB"));
+          if(!cupomUsado) continue;
+          const embId = cupomMap[cupomUsado];
+          if(!embId) continue; // cupom nao pertence a embaixador ativo
+          if(p.payment_status==="voided"||p.payment_status==="refunded") continue;
+          // Verificar se ja existe
+          const {data:ex} = await supabase.from("comissoes").select("id").eq("pedido_id",String(p.id)).maybeSingle();
+          if(ex) continue;
+          const val = parseFloat(p.total);
+          const status = p.payment_status==="paid" ? (diasPassados(p.created_at,CONFIG.JANELA_DEVOLUCAO)?"confirmada":"pendente") : "pendente";
+          const {error} = await supabase.from("comissoes").insert({
+            embaixador_id:embId, pedido_id:String(p.id),
+            valor_pedido:val, valor_comissao:val*CONFIG.COMISSAO_PCT,
+            status, payment_status:p.payment_status, criado_em:p.created_at
+          });
+          if(!error) novas++;
         } catch(e){ erros++; }
         setSyncLog(l=>({...l,novas,erros}));
-        // pequena pausa para não estourar rate limit da Nuvemshop
-        await new Promise(r=>setTimeout(r,300));
       }
+
+      // 5. Salvar timestamp da sync
+      const agora = new Date().toISOString();
+      await supabase.from("config").upsert({chave:"ultima_sync",valor:agora},{onConflict:"chave"});
+
       setSyncLog(l=>({...l,atual:"Concluido!"}));
     } catch(e){ setSyncLog(l=>({...l,atual:"Erro: "+String(e)})); }
     setSyncAdmin("done");
