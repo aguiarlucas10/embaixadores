@@ -192,6 +192,10 @@
         <label>Prefixo dos cupons</label>
         <input type="text" id="prefixo" value="SGB"/>
       </div>
+      <div class="field">
+        <label>Pedidos por lote <span style="color:#555;font-size:9px">(recomendado: 50)</span></label>
+        <input type="number" id="porPagina" value="50" min="10" max="200" step="10"/>
+      </div>
     </div>
     <div class="config-row">
       <div class="field">
@@ -321,25 +325,52 @@ async function rodar(isDry) {
   log(isDry ? "=== MODO SIMULAÇÃO (nada será salvo) ===" : "=== IMPORTAÇÃO REAL ===", "head");
   log(`Intervalo: ${dataDe} → ${dataAte} | Prefixo: ${prefixo} | Comissão: ${comPct*100}%`, "info");
 
-  // ---- 1. Buscar todos os pedidos via Edge Function ----
-  setProgress(5, `Buscando pedidos de ${dataDe} a ${dataAte}...`);
-  log("Chamando orders_since na Edge Function...", "info");
+  // ---- 1. Buscar pedidos paginados (evita WORKER_LIMIT na Edge Function) ----
+  const POR_PAGINA = Number(document.getElementById("porPagina").value) || 50;
+  log(`Buscando em lotes de ${POR_PAGINA} pedidos por chamada...`, "info");
 
   let pedidos = [];
-  try {
-    const r = await fetch(`${PROXY}?action=orders_since&since=${encodeURIComponent(dataDe)}&until=${encodeURIComponent(dataAte)}`, { headers: HEADERS });
-    if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
-    pedidos = await r.json();
-    if (!Array.isArray(pedidos)) throw new Error("Resposta inesperada: " + JSON.stringify(pedidos).slice(0,200));
-  } catch(e) {
-    log("ERRO ao buscar pedidos: " + e.message, "error");
+  let pagina = 1;
+  let erroFetch = false;
+  let totalPaginas = "?";
+
+  while (true) {
+    setProgress(5 + Math.min((pagina / 20) * 15, 15), `Buscando lote ${pagina}/${totalPaginas}...`);
+    log(`Buscando página ${pagina} (${POR_PAGINA} pedidos)...`, "dim");
+
+    let resultado;
+    try {
+      const url = `${PROXY}?action=orders_since&since=${encodeURIComponent(dataDe)}&until=${encodeURIComponent(dataAte)}&page=${pagina}&per_page=${POR_PAGINA}`;
+      const r = await fetch(url, { headers: HEADERS });
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+      resultado = await r.json();
+      if (!Array.isArray(resultado)) throw new Error("Resposta inesperada: " + JSON.stringify(resultado).slice(0, 200));
+    } catch(e) {
+      log(`ERRO na página ${pagina}: ${e.message}`, "error");
+      erroFetch = true;
+      break;
+    }
+
+    pedidos = pedidos.concat(resultado);
+    log(`  ${resultado.length} pedido(s) recebidos (total acumulado: ${pedidos.length}).`, resultado.length > 0 ? "ok" : "dim");
+
+    // Se retornou menos que o solicitado, chegamos na última página
+    if (resultado.length < POR_PAGINA) {
+      log(`Última página atingida.`, "dim");
+      break;
+    }
+
+    pagina++;
+    // Pausa entre páginas para não sobrecarregar
+    await new Promise(res => setTimeout(res, 400));
+  }
+
+  if (erroFetch) {
     document.getElementById("btnDry").disabled = false;
     return;
   }
 
-  log(`${pedidos.length} pedidos retornados pela API.`, "ok");
-
-  // Filtro client-side por intervalo (garante o corte de datas mesmo se a Edge Function não suportar "until")
+  // Filtro client-side por intervalo de datas (garante corte mesmo se a EF ignorar "until")
   const dtDe  = new Date(dataDe + "T00:00:00");
   const dtAte = new Date(dataAte + "T23:59:59");
   const noPeriodo = pedidos.filter(p => {
@@ -349,6 +380,7 @@ async function rodar(isDry) {
   const fora = pedidos.length - noPeriodo.length;
   if (fora > 0) log(`${fora} pedido(s) fora do intervalo removidos (filtro client-side).`, "dim");
 
+  log(`Total: ${noPeriodo.length} pedido(s) no período.`, "ok");
   setStat("sPedidos", noPeriodo.length);
   setProgress(20, "Filtrando pedidos com cupom " + prefixo + "...");
 
