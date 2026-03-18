@@ -563,7 +563,7 @@ function PageAdmin({user,onLogout}){
 
   async function load(){
     setLoading(true);
-    const {data:e}=await supabase.from("embaixadores_sg").select("*, comissoes_sg(valor_comissao,status,resgatada)").order("criado_em",{ascending:false});
+    const {data:e}=await supabase.from("embaixadores_sg").select("*, comissoes_sg(valor_comissao,valor_pedido,status,payment_status,resgatada)").order("criado_em",{ascending:false});
     setEmbs(e||[]);
     const {data:r}=await supabase.from("resgates_sg").select("*, embaixadores_sg(nome,email,cupom,pix_key)").eq("status","solicitado").order("criado_em",{ascending:false});
     setRess(r||[]);
