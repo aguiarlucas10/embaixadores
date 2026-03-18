@@ -194,7 +194,7 @@
       </div>
       <div class="field">
         <label>Pedidos por lote <span style="color:#555;font-size:9px">(recomendado: 50)</span></label>
-        <input type="number" id="porPagina" value="50" min="10" max="200" step="10"/>
+        <input type="number" id="porPagina" value="200" min="10" max="200" step="10"/>
       </div>
     </div>
     <div class="config-row">
@@ -204,7 +204,7 @@
       </div>
       <div class="field">
         <label>Janela de devolução (dias)</label>
-        <input type="number" id="janelaDev" value="7" min="0" max="60"/>
+        <input type="number" id="janelaDev" value="1" min="0" max="60"/>
       </div>
     </div>
   </div>
@@ -325,52 +325,58 @@ async function rodar(isDry) {
   log(isDry ? "=== MODO SIMULAÇÃO (nada será salvo) ===" : "=== IMPORTAÇÃO REAL ===", "head");
   log(`Intervalo: ${dataDe} → ${dataAte} | Prefixo: ${prefixo} | Comissão: ${comPct*100}%`, "info");
 
-  // ---- 1. Buscar pedidos paginados (evita WORKER_LIMIT na Edge Function) ----
-  const POR_PAGINA = Number(document.getElementById("porPagina").value) || 50;
-  log(`Buscando em lotes de ${POR_PAGINA} pedidos por chamada...`, "info");
+  // ---- 1. Buscar pedidos paginados com cursor since_id ----
+  // Usa since_id em vez de page para contornar o limite de 10.000 resultados da Nuvemshop.
+  const POR_PAGINA = Number(document.getElementById("porPagina").value) || 200;
+  log(`Buscando em lotes de ${POR_PAGINA} pedidos por chamada (cursor since_id)...`, "info");
 
   let pedidos = [];
-  let pagina = 1;
+  let lote_num = 1;
+  let sinceId  = "";   // cursor: id do último pedido recebido
   let erroFetch = false;
-  let totalPaginas = "?";
 
   while (true) {
-    setProgress(5 + Math.min((pagina / 20) * 15, 15), `Buscando lote ${pagina}/${totalPaginas}...`);
-    log(`Buscando página ${pagina} (${POR_PAGINA} pedidos)...`, "dim");
+    setProgress(5 + Math.min((lote_num / 20) * 15, 15), `Buscando lote ${lote_num}...`);
+    log(`Buscando lote ${lote_num}${sinceId ? " (desde id " + sinceId + ")" : ""}...`, "dim");
 
     let resposta;
     try {
-      const url = `${PROXY}?action=orders_since&since=${encodeURIComponent(dataDe)}&until=${encodeURIComponent(dataAte)}&page=${pagina}&per_page=${POR_PAGINA}`;
+      let url = `${PROXY}?action=orders_since`
+        + `&since=${encodeURIComponent(dataDe)}`
+        + `&until=${encodeURIComponent(dataAte)}`
+        + `&per_page=${POR_PAGINA}`;
+      if (sinceId) url += `&since_id=${sinceId}`;
+
       const r = await fetch(url, { headers: HEADERS });
       if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
       resposta = await r.json();
-      // Suporte ao novo formato { orders, page_total, has_more }
-      if (!resposta || (!Array.isArray(resposta) && !Array.isArray(resposta.orders))) {
+      if (!resposta || !Array.isArray(resposta.orders)) {
         throw new Error("Resposta inesperada: " + JSON.stringify(resposta).slice(0, 200));
       }
     } catch(e) {
-      log(`ERRO na página ${pagina}: ${e.message}`, "error");
+      log(`ERRO no lote ${lote_num}: ${e.message}`, "error");
       erroFetch = true;
       break;
     }
 
-    // Compatível com formato antigo (array) e novo ({ orders, has_more })
-    const isNovo   = resposta && !Array.isArray(resposta) && Array.isArray(resposta.orders);
-    const lote     = isNovo ? resposta.orders     : resposta;
-    const hasMore  = isNovo ? resposta.has_more   : lote.length >= POR_PAGINA;
-    const pageTotal = isNovo ? resposta.page_total : lote.length;
+    const lote      = resposta.orders;
+    const hasMore   = resposta.has_more;
+    const pageTotal = resposta.page_total;
+    const lastId    = resposta.last_id;
 
     pedidos = pedidos.concat(lote);
-    log(`  Página ${pagina}: ${pageTotal} pedidos brutos → ${lote.length} com cupom SGB (acumulado: ${pedidos.length}).`, lote.length > 0 ? "ok" : "dim");
+    const primeiraDt = resposta.orders.length > 0
+      ? new Date(resposta.orders[0].created_at).toLocaleDateString("pt-BR", {day:"2-digit",month:"2-digit",year:"2-digit"})
+      : "—";
+    log(`  Lote ${lote_num} (${primeiraDt}): ${pageTotal} pedidos brutos → ${lote.length} com cupom SGB (acumulado: ${pedidos.length}).`, lote.length > 0 ? "ok" : "dim");
 
-    // Para quando não há mais páginas
-    if (!hasMore) {
-      log(`Última página atingida (página ${pagina}).`, "dim");
+    if (!hasMore || !lastId) {
+      log(`Última página atingida (lote ${lote_num}).`, "dim");
       break;
     }
 
-    pagina++;
-    // Pausa entre páginas para não sobrecarregar
+    sinceId = lastId;  // avança o cursor
+    lote_num++;
     await new Promise(res => setTimeout(res, 400));
   }
 
