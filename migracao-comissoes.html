@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Migração de Comissões — Saint Germain</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: #0a0a0a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  /* Header */
+  .header { margin-bottom: 48px; }
+  .brand { font-size: 10px; letter-spacing: 0.35em; text-transform: uppercase; color: #555; margin-bottom: 6px; }
+  .title { font-family: 'Georgia', serif; font-size: 32px; font-weight: normal; color: #fff; letter-spacing: 0.02em; }
+  .subtitle { font-size: 11px; letter-spacing: 0.15em; color: #555; margin-top: 6px; text-transform: uppercase; }
+
+  /* Config panel */
+  .config-panel {
+    border: 1px solid #222;
+    padding: 28px 32px;
+    margin-bottom: 28px;
+    background: #111;
+  }
+  .config-label { font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: #555; margin-bottom: 10px; display: block; }
+  .config-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: #555; }
+  .field input {
+    background: #0a0a0a;
+    border: 1px solid #2a2a2a;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .field input:focus { border-color: #555; }
+
+  .warn-box {
+    background: #1a1200;
+    border: 1px solid #3a2800;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-size: 11px;
+    color: #c8900a;
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+  }
+  .warn-box strong { color: #f0a820; }
+
+  /* Buttons */
+  .btn-run {
+    background: #fff;
+    color: #000;
+    border: none;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    padding: 16px 40px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn-run:hover:not(:disabled) { opacity: 0.85; }
+  .btn-run:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary {
+    background: transparent;
+    color: #555;
+    border: 1px solid #2a2a2a;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-left: 12px;
+  }
+  .btn-secondary:hover:not(:disabled) { color: #aaa; border-color: #444; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Stats */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: #222;
+    border: 1px solid #222;
+    margin-bottom: 28px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .stats-bar.visible { opacity: 1; }
+  .stat {
+    background: #111;
+    padding: 18px 16px;
+    text-align: center;
+  }
+  .stat-val { font-family: 'Georgia', serif; font-size: 26px; font-weight: normal; color: #fff; margin-bottom: 4px; transition: color 0.3s; }
+  .stat-val.green { color: #3a9d5c; }
+  .stat-val.yellow { color: #c8900a; }
+  .stat-val.red { color: #c03030; }
+  .stat-lbl { font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: #555; }
+
+  /* Progress */
+  .progress-wrap { margin-bottom: 28px; display: none; }
+  .progress-wrap.visible { display: block; }
+  .progress-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .progress-label { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: #555; }
+  .progress-pct { font-size: 9px; letter-spacing: 0.1em; color: #777; }
+  .progress-track { height: 2px; background: #1a1a1a; }
+  .progress-fill { height: 2px; background: #fff; width: 0%; transition: width 0.4s ease; }
+
+  /* Log terminal */
+  .terminal {
+    background: #050505;
+    border: 1px solid #1a1a1a;
+    padding: 20px 24px;
+    height: 420px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.8;
+    display: none;
+  }
+  .terminal.visible { display: block; }
+  .log-line { display: flex; gap: 12px; }
+  .log-time { color: #333; flex-shrink: 0; user-select: none; }
+  .log-msg { color: #888; }
+  .log-msg.info { color: #888; }
+  .log-msg.ok { color: #3a9d5c; }
+  .log-msg.warn { color: #c8900a; }
+  .log-msg.error { color: #c03030; }
+  .log-msg.head { color: #ccc; font-weight: bold; }
+  .log-msg.dim { color: #444; }
+
+  /* Result summary */
+  .result-box {
+    border: 1px solid #1a3a1a;
+    background: #0a1a0a;
+    padding: 24px 28px;
+    margin-top: 20px;
+    display: none;
+  }
+  .result-box.visible { display: block; }
+  .result-title { font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: #3a9d5c; margin-bottom: 12px; }
+  .result-body { font-family: 'Georgia', serif; font-size: 18px; color: #fff; line-height: 1.8; }
+  .result-body span { color: #3a9d5c; }
+
+  .spinner { width: 12px; height: 12px; border: 1.5px solid #555; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .divider { border: none; border-top: 1px solid #1a1a1a; margin: 28px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <p class="brand">Saint Germain — Portal Embaixadoras</p>
+    <h1 class="title">Migração de Comissões</h1>
+    <p class="subtitle">Importação em massa via Nuvemshop API</p>
+  </div>
+
+  <!-- Config -->
+  <div class="config-panel">
+    <span class="config-label">Configuração da migração</span>
+    <div class="config-row">
+      <div class="field">
+        <label>Data início do intervalo</label>
+        <input type="date" id="dataDe" value="2026-03-09"/>
+      </div>
+      <div class="field">
+        <label>Data fim do intervalo</label>
+        <input type="date" id="dataAte"/>
+      </div>
+    </div>
+    <div class="config-row">
+      <div class="field">
+        <label>Prefixo dos cupons</label>
+        <input type="text" id="prefixo" value="SGB"/>
+      </div>
+    </div>
+    <div class="config-row">
+      <div class="field">
+        <label>% de comissão</label>
+        <input type="number" id="comissaoPct" value="10" min="1" max="100" step="0.1"/>
+      </div>
+      <div class="field">
+        <label>Janela de devolução (dias)</label>
+        <input type="number" id="janelaDev" value="7" min="0" max="60"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn-box">
+    <strong>⚠ Atenção antes de rodar:</strong><br/>
+    Este script verifica <strong>pedido_id existente</strong> antes de inserir — pedidos já cadastrados serão <strong>ignorados automaticamente</strong>, sem risco de duplicação.<br/>
+    Recomendado rodar primeiro em modo <strong>dry-run</strong> (simulação) para ver o que seria importado antes de confirmar.
+  </div>
+
+  <!-- Actions -->
+  <div style="margin-bottom: 28px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px;">
+    <button class="btn-run" id="btnDry" onclick="rodar(true)">
+      <span>Simular (dry-run)</span>
+    </button>
+    <button class="btn-secondary" id="btnReal" onclick="rodar(false)" disabled>
+      Importar de verdade
+    </button>
+    <button class="btn-secondary" id="btnReset" onclick="resetar()" style="display:none">
+      Nova simulação
+    </button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat"><div class="stat-val" id="sPedidos">—</div><div class="stat-lbl">Pedidos encontrados</div></div>
+    <div class="stat"><div class="stat-val" id="sMatch">—</div><div class="stat-lbl">Com cupom SGB</div></div>
+    <div class="stat"><div class="stat-val green" id="sNovos">—</div><div class="stat-lbl">Novos para importar</div></div>
+    <div class="stat"><div class="stat-val yellow" id="sDupl">—</div><div class="stat-lbl">Já existiam</div></div>
+    <div class="stat"><div class="stat-val" id="sFat">—</div><div class="stat-lbl">Faturamento total</div></div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-header">
+      <span class="progress-label" id="progressLabel">Processando...</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="terminal" id="terminal"></div>
+
+  <!-- Result -->
+  <div class="result-box" id="resultBox">
+    <p class="result-title">✓ Migração concluída</p>
+    <p class="result-body" id="resultBody"></p>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// CONFIG (mesmas credenciais do portal)
+// ============================================================
+const SUPABASE_URL  = "https://fsfqnshkfwnfeswwdmxg.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnFuc2hrZnduZmVzd3dkbXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MzcxNDAsImV4cCI6MjA4ODMxMzE0MH0.XO5JpNdnu03tRLGUsisi3I_lTZHcMwhJMlw9VBrXkK8";
+const PROXY         = SUPABASE_URL + "/functions/v1/bright-api";
+const HEADERS       = { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON}` };
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ============================================================
+// HELPERS
+// ============================================================
+const brl = v => "R$ " + (v||0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+const now  = () => new Date().toTimeString().slice(0,8);
+
+function log(msg, tipo = "info") {
+  const t = document.getElementById("terminal");
+  const line = document.createElement("div");
+  line.className = "log-line";
+  line.innerHTML = `<span class="log-time">${now()}</span><span class="log-msg ${tipo}">${msg}</span>`;
+  t.appendChild(line);
+  t.scrollTop = t.scrollHeight;
+}
+
+function setStat(id, val, cls) {
+  const el = document.getElementById(id);
+  el.textContent = val;
+  if (cls) { el.className = "stat-val " + cls; }
+}
+
+function setProgress(pct, label) {
+  document.getElementById("progressFill").style.width = pct + "%";
+  document.getElementById("progressPct").textContent = Math.round(pct) + "%";
+  if (label) document.getElementById("progressLabel").textContent = label;
+}
+
+function diasPassados(dateStr, n) {
+  return (Date.now() - new Date(dateStr).getTime()) / 86400000 >= n;
+}
+
+// ============================================================
+// MAIN
+// ============================================================
+let dryRunResult = null;
+
+async function rodar(isDry) {
+  const dataDe    = document.getElementById("dataDe").value;
+  const dataAte   = document.getElementById("dataAte").value;
+  const prefixo   = document.getElementById("prefixo").value.trim().toUpperCase();
+  const comPct    = parseFloat(document.getElementById("comissaoPct").value) / 100;
+  const janela    = parseInt(document.getElementById("janelaDev").value);
+
+  if (!dataDe || !dataAte) { alert("Informe as datas de início e fim do intervalo."); return; }
+  if (dataAte < dataDe) { alert("A data fim deve ser igual ou posterior à data início."); return; }
+
+  // UI setup
+  document.getElementById("btnDry").disabled  = true;
+  document.getElementById("btnReal").disabled = true;
+  document.getElementById("terminal").className = "terminal visible";
+  document.getElementById("progressWrap").className = "progress-wrap visible";
+  document.getElementById("statsBar").className = "stats-bar visible";
+  document.getElementById("resultBox").className = "result-box";
+
+  log(isDry ? "=== MODO SIMULAÇÃO (nada será salvo) ===" : "=== IMPORTAÇÃO REAL ===", "head");
+  log(`Intervalo: ${dataDe} → ${dataAte} | Prefixo: ${prefixo} | Comissão: ${comPct*100}%`, "info");
+
+  // ---- 1. Buscar todos os pedidos via Edge Function ----
+  setProgress(5, `Buscando pedidos de ${dataDe} a ${dataAte}...`);
+  log("Chamando orders_since na Edge Function...", "info");
+
+  let pedidos = [];
+  try {
+    const r = await fetch(`${PROXY}?action=orders_since&since=${encodeURIComponent(dataDe)}&until=${encodeURIComponent(dataAte)}`, { headers: HEADERS });
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+    pedidos = await r.json();
+    if (!Array.isArray(pedidos)) throw new Error("Resposta inesperada: " + JSON.stringify(pedidos).slice(0,200));
+  } catch(e) {
+    log("ERRO ao buscar pedidos: " + e.message, "error");
+    document.getElementById("btnDry").disabled = false;
+    return;
+  }
+
+  log(`${pedidos.length} pedidos retornados pela API.`, "ok");
+
+  // Filtro client-side por intervalo (garante o corte de datas mesmo se a Edge Function não suportar "until")
+  const dtDe  = new Date(dataDe + "T00:00:00");
+  const dtAte = new Date(dataAte + "T23:59:59");
+  const noPeriodo = pedidos.filter(p => {
+    const d = new Date(p.created_at);
+    return d >= dtDe && d <= dtAte;
+  });
+  const fora = pedidos.length - noPeriodo.length;
+  if (fora > 0) log(`${fora} pedido(s) fora do intervalo removidos (filtro client-side).`, "dim");
+
+  setStat("sPedidos", noPeriodo.length);
+  setProgress(20, "Filtrando pedidos com cupom " + prefixo + "...");
+
+  // ---- 2. Filtrar pedidos com cupom SGB ----
+  const comCupom = noPeriodo.filter(p => {
+    const cupons = p.coupon || [];
+    return cupons.some(c => String(c.code || "").toUpperCase().startsWith(prefixo));
+  });
+
+  log(`${comCupom.length} pedidos com cupom "${prefixo}*" encontrados.`, comCupom.length > 0 ? "ok" : "warn");
+  setStat("sMatch", comCupom.length);
+
+  // Filtrar pagos/válidos
+  const validos = comCupom.filter(p => p.payment_status !== "voided" && p.payment_status !== "refunded");
+  const ignorados = comCupom.length - validos.length;
+  if (ignorados > 0) log(`${ignorados} ignorados (voided/refunded).`, "warn");
+
+  // Calcular faturamento
+  const fat = validos.reduce((s, p) => s + (parseFloat(p.total) || 0), 0);
+  setStat("sFat", brl(fat));
+
+  setProgress(35, "Carregando embaixadoras do Supabase...");
+
+  // ---- 3. Buscar todas as embaixadoras ----
+  const { data: embs, error: embErr } = await sb.from("embaixadores").select("id, cupom");
+  if (embErr) { log("ERRO ao carregar embaixadoras: " + embErr.message, "error"); return; }
+
+  // Mapa cupom → embaixador_id (case-insensitive)
+  const mapaEmb = {};
+  (embs || []).forEach(e => { if (e.cupom) mapaEmb[e.cupom.toUpperCase()] = e.id; });
+
+  log(`${Object.keys(mapaEmb).length} embaixadoras carregadas do Supabase.`, "ok");
+  log("", "dim");
+
+  setProgress(45, "Verificando duplicatas no Supabase...");
+
+  // ---- 4. Checar pedidos ja existentes (por pedido_id) ----
+  const idsNuvem = validos.map(p => String(p.id));
+  const { data: jaExist } = await sb.from("comissoes").select("pedido_id").in("pedido_id", idsNuvem);
+  const existPedSet = new Set((jaExist || []).map(x => x.pedido_id));
+
+  const novos = validos.filter(p => !existPedSet.has(String(p.id)));
+  const dupls = validos.filter(p =>  existPedSet.has(String(p.id)));
+
+  setStat("sNovos", novos.length, novos.length > 0 ? "green" : "");
+  setStat("sDupl",  dupls.length, dupls.length > 0 ? "yellow" : "");
+
+  log(`${novos.length} pedidos novos para importar.`, "ok");
+  log(`${dupls.length} já existiam — serão ignorados.`, dupls.length > 0 ? "warn" : "dim");
+  log("", "dim");
+
+  // ---- 5. Detalhar o que seria importado ----
+  let semEmbaixadora = 0;
+  const paraImportar = [];
+
+  for (const p of novos) {
+    const cupom = (p.coupon || []).find(c => c.code.toUpperCase().startsWith(prefixo));
+    const cupomCode = cupom?.code?.toUpperCase();
+    const embId = cupomCode ? mapaEmb[cupomCode] : null;
+
+    if (!embId) {
+      log(`⚠  Pedido #${p.id} — cupom "${cupomCode}" sem embaixadora cadastrada. Ignorando.`, "warn");
+      semEmbaixadora++;
+      continue;
+    }
+
+    const val    = parseFloat(p.total) || 0;
+    const status = p.payment_status === "paid"
+      ? (diasPassados(p.created_at, janela) ? "confirmada" : "pendente")
+      : "pendente";
+
+    paraImportar.push({
+      embaixador_id:  embId,
+      pedido_id:      String(p.id),
+      valor_pedido:   val,
+      valor_comissao: parseFloat((val * comPct).toFixed(2)),
+      status,
+      payment_status: p.payment_status,
+      criado_em:      p.created_at,
+      resgatada:      false,
+    });
+
+    log(`  #${p.id} | ${cupomCode} | ${brl(val)} | ${p.payment_status} → ${status}`, "info");
+  }
+
+  if (semEmbaixadora > 0) log(`${semEmbaixadora} pedido(s) sem embaixadora correspondente.`, "warn");
+  log("", "dim");
+
+  // ---- 6. Dry-run: salvar resultado e oferecer importação real ----
+  if (isDry) {
+    dryRunResult = paraImportar;
+    setProgress(100, "Simulação concluída");
+    log(`=== SIMULAÇÃO CONCLUÍDA ===`, "head");
+    log(`${paraImportar.length} registros seriam criados.`, "ok");
+    log(`Clique em "Importar de verdade" para confirmar.`, "info");
+
+    if (paraImportar.length > 0) {
+      document.getElementById("btnReal").disabled = false;
+    }
+    document.getElementById("btnDry").disabled = false;
+    document.getElementById("btnReset").style.display = "inline-block";
+    return;
+  }
+
+  // ---- 7. Importação real ----
+  if (!paraImportar.length) {
+    log("Nada a importar.", "warn");
+    setProgress(100, "Concluído");
+    return;
+  }
+
+  log(`Iniciando importação de ${paraImportar.length} registros...`, "head");
+  let importados = 0, erros = 0;
+
+  for (let i = 0; i < paraImportar.length; i++) {
+    const rec = paraImportar[i];
+    setProgress(50 + ((i / paraImportar.length) * 50), `Importando ${i+1}/${paraImportar.length}...`);
+
+    const { error } = await sb.from("comissoes").insert(rec);
+    if (error) {
+      log(`  ERRO #${rec.pedido_id}: ${error.message}`, "error");
+      erros++;
+    } else {
+      importados++;
+    }
+  }
+
+  setProgress(100, "Importação concluída");
+  log("", "dim");
+  log(`=== IMPORTAÇÃO CONCLUÍDA ===`, "head");
+  log(`${importados} comissões criadas com sucesso.`, "ok");
+  if (erros > 0) log(`${erros} erros (verifique acima).`, "error");
+
+  // Result box
+  const totalCom = paraImportar.reduce((s, r) => s + r.valor_comissao, 0);
+  const totalFat = paraImportar.reduce((s, r) => s + r.valor_pedido, 0);
+  document.getElementById("resultBody").innerHTML =
+    `<span>${importados}</span> comissões importadas<br/>` +
+    `Faturamento registrado: <span>${brl(totalFat)}</span><br/>` +
+    `Total em comissões: <span>${brl(totalCom)}</span>`;
+  document.getElementById("resultBox").className = "result-box visible";
+
+  document.getElementById("btnReset").style.display = "inline-block";
+}
+
+function resetar() {
+  dryRunResult = null;
+  document.getElementById("terminal").innerHTML = "";
+  document.getElementById("terminal").className = "terminal";
+  document.getElementById("progressWrap").className = "progress-wrap";
+  document.getElementById("statsBar").className = "stats-bar";
+  document.getElementById("resultBox").className = "result-box";
+  document.getElementById("progressFill").style.width = "0%";
+  document.getElementById("btnDry").disabled = false;
+  document.getElementById("btnReal").disabled = true;
+  document.getElementById("btnReset").style.display = "none";
+  ["sPedidos","sMatch","sNovos","sDupl","sFat"].forEach(id => {
+    document.getElementById(id).textContent = "—";
+    document.getElementById(id).className = "stat-val";
+  });
+}
+</script>
+<script>
+// Setar data fim como hoje por padrão
+document.getElementById("dataAte").value = new Date().toISOString().slice(0, 10);
+</script>
+</body>
+</html>
