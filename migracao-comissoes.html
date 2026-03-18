@@ -338,25 +338,34 @@ async function rodar(isDry) {
     setProgress(5 + Math.min((pagina / 20) * 15, 15), `Buscando lote ${pagina}/${totalPaginas}...`);
     log(`Buscando página ${pagina} (${POR_PAGINA} pedidos)...`, "dim");
 
-    let resultado;
+    let resposta;
     try {
       const url = `${PROXY}?action=orders_since&since=${encodeURIComponent(dataDe)}&until=${encodeURIComponent(dataAte)}&page=${pagina}&per_page=${POR_PAGINA}`;
       const r = await fetch(url, { headers: HEADERS });
       if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
-      resultado = await r.json();
-      if (!Array.isArray(resultado)) throw new Error("Resposta inesperada: " + JSON.stringify(resultado).slice(0, 200));
+      resposta = await r.json();
+      // Suporte ao novo formato { orders, page_total, has_more }
+      if (!resposta || (!Array.isArray(resposta) && !Array.isArray(resposta.orders))) {
+        throw new Error("Resposta inesperada: " + JSON.stringify(resposta).slice(0, 200));
+      }
     } catch(e) {
       log(`ERRO na página ${pagina}: ${e.message}`, "error");
       erroFetch = true;
       break;
     }
 
-    pedidos = pedidos.concat(resultado);
-    log(`  ${resultado.length} pedido(s) recebidos (total acumulado: ${pedidos.length}).`, resultado.length > 0 ? "ok" : "dim");
+    // Compatível com formato antigo (array) e novo ({ orders, has_more })
+    const isNovo   = resposta && !Array.isArray(resposta) && Array.isArray(resposta.orders);
+    const lote     = isNovo ? resposta.orders     : resposta;
+    const hasMore  = isNovo ? resposta.has_more   : lote.length >= POR_PAGINA;
+    const pageTotal = isNovo ? resposta.page_total : lote.length;
 
-    // Se retornou menos que o solicitado, chegamos na última página
-    if (resultado.length < POR_PAGINA) {
-      log(`Última página atingida.`, "dim");
+    pedidos = pedidos.concat(lote);
+    log(`  Página ${pagina}: ${pageTotal} pedidos brutos → ${lote.length} com cupom SGB (acumulado: ${pedidos.length}).`, lote.length > 0 ? "ok" : "dim");
+
+    // Para quando não há mais páginas
+    if (!hasMore) {
+      log(`Última página atingida (página ${pagina}).`, "dim");
       break;
     }
 
