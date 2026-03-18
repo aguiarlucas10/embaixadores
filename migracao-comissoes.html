@@ -350,7 +350,7 @@ async function rodar(isDry) {
       const r = await fetch(url, { headers: HEADERS });
       if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
       resposta = await r.json();
-      if (!resposta || !Array.isArray(resposta.orders)) {
+      if (!resposta || (!Array.isArray(resposta) && !Array.isArray(resposta.orders))) {
         throw new Error("Resposta inesperada: " + JSON.stringify(resposta).slice(0, 200));
       }
     } catch(e) {
@@ -359,10 +359,14 @@ async function rodar(isDry) {
       break;
     }
 
-    const lote      = resposta.orders;
-    const hasMore   = resposta.has_more;
-    const pageTotal = resposta.page_total;
-    const lastId    = resposta.last_id;
+    // Suporte ao formato novo { orders, has_more, last_id } e antigo (array puro)
+    const formatoNovo = !Array.isArray(resposta) && Array.isArray(resposta?.orders);
+    const lote      = formatoNovo ? resposta.orders    : resposta;
+    const pageTotal = formatoNovo ? resposta.page_total : lote.length;
+    const lastId    = formatoNovo ? resposta.last_id    : (lote.length > 0 ? lote[lote.length - 1].id : null);
+    const hasMore   = formatoNovo ? resposta.has_more   : lote.length >= POR_PAGINA;
+
+    if (!formatoNovo) log(`  ⚠ Edge Function retornou formato antigo (array). Deploy pendente?`, "warn");
 
     pedidos = pedidos.concat(lote);
     const primeiraDt = resposta.orders.length > 0
