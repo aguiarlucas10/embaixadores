@@ -3976,18 +3976,21 @@ function PageRedefinirSenha({ onConcluido }) {
 
 // -- APP -----------------------------------------------------------------------
 function App() {
-  const [page, setPage] = React.useState(()=>window.location.hash.replace("#","")||"cadastro");
+  // Detecta token de recuperacao ja na inicializacao, antes de qualquer render
+  const hashInicial = window.location.hash;
+  const isRecoveryURL = hashInicial.includes("type=recovery");
+
+  const [page, setPage] = React.useState(()=>{
+    if (isRecoveryURL) return "login";
+    return hashInicial.replace("#","")||"cadastro";
+  });
   const [user, setUser] = React.useState(null);
   const [checking, setChecking] = React.useState(true);
-  const [isRecovery, setIsRecovery] = React.useState(false);
+  const [isRecovery, setIsRecovery] = React.useState(isRecoveryURL);
 
   React.useEffect(()=>{
-    // Detecta token de recuperacao na URL (Supabase coloca #access_token=...&type=recovery)
-    const hash = window.location.hash;
-    if (hash.includes("type=recovery") || hash.includes("type=signup")) {
-      setIsRecovery(true);
-      // Limpa o hash da URL para nao ficar visivel
-      window.history.replaceState(null, "", window.location.pathname);
+    if (isRecoveryURL) {
+      window.history.replaceState(null, "", window.location.pathname + "#login");
     }
 
     supabase.auth.getSession().then(({data})=>{
@@ -4011,8 +4014,8 @@ function App() {
   async function handleLogout(){await supabase.auth.signOut();setUser(null);setPage("login");}
   function handleRecoveryConcluido(){setIsRecovery(false);setPage("login");}
 
-  if(checking) return <Spinner/>;
-  if(isRecovery && user) return <PageRedefinirSenha onConcluido={handleRecoveryConcluido}/>;
+  if(checking && !isRecovery) return <Spinner/>;;
+  if(isRecovery) return <PageRedefinirSenha onConcluido={handleRecoveryConcluido}/>;
   if(page==="cadastro") return <PageCadastro onNavigate={setPage}/>;
   if(page==="login") return <PageLogin onLogin={handleLogin} onNavigate={setPage}/>;
   if(page==="painel") return user?<PagePainel user={user} onLogout={handleLogout}/>:<PageLogin onLogin={handleLogin} onNavigate={setPage}/>;
