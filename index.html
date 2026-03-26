@@ -980,7 +980,7 @@ function PageLogin({ onLogin, onNavigate }) {
     if (!email) { setErr("Digite seu e-mail para continuar."); return; }
     setErr(""); setLoadingRec(true);
     const {error:e} = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + window.location.pathname
+      redirectTo: "https://embaixadores.saintgermainbrand.com.br"
     });
     setLoadingRec(false);
     if (e) { setErr("Não foi possível enviar o e-mail. Verifique o endereço."); return; }
