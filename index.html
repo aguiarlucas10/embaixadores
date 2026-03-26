@@ -3924,22 +3924,95 @@ function PageWhatsApp({ embs }) {
 }
 
 
+// -- PAGINA REDEFINIR SENHA ---------------------------------------------------
+function PageRedefinirSenha({ onConcluido }) {
+  const [novaSenha, setNovaSenha] = React.useState("");
+  const [confirmSenha, setConfirmSenha] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [msg, setMsg] = React.useState(null); // {text, ok}
+
+  async function salvar() {
+    if (!novaSenha || novaSenha.length < 6) { setMsg({text:"A senha deve ter pelo menos 6 caracteres.",ok:false}); return; }
+    if (novaSenha !== confirmSenha) { setMsg({text:"As senhas não conferem.",ok:false}); return; }
+    setLoading(true); setMsg(null);
+    const {error} = await supabase.auth.updateUser({password: novaSenha});
+    setLoading(false);
+    if (error) { setMsg({text:"Erro ao redefinir: "+error.message,ok:false}); return; }
+    setMsg({text:"Senha redefinida com sucesso!",ok:true});
+    setTimeout(()=>onConcluido(), 2000);
+  }
+
+  return (
+    <div style={{minHeight:"100vh",background:T.white}}>
+      <Header/>
+      <SplitLayout
+        left={
+          <div className="stagger" style={{display:"flex",flexDirection:"column",justifyContent:"center",height:"100%"}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",color:T.g500,marginBottom:40}}>Painel do Embaixador</p>
+            <h1 style={{fontFamily:T.serif,fontSize:52,fontWeight:300,color:T.white,lineHeight:1.08}}>
+              <span>Nova<br/><em>senha.</em></span>
+            </h1>
+          </div>
+        }
+        right={
+          <div className="stagger" style={{display:"flex",flexDirection:"column",justifyContent:"center",height:"100%"}}>
+            <p style={{fontFamily:T.sans,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:48}}>Redefinir senha</p>
+            <div style={{display:"flex",flexDirection:"column",gap:28,marginBottom:40}}>
+              <Input label="Nova senha" type="password" value={novaSenha} onChange={e=>setNovaSenha(e.target.value)} placeholder="Mínimo 6 caracteres"/>
+              <Input label="Confirmar nova senha" type="password" value={confirmSenha} onChange={e=>setConfirmSenha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&salvar()}/>
+            </div>
+            {msg && (
+              <div style={{marginBottom:24,padding:"14px 16px",background:msg.ok?"#f0faf0":"#fdf2f2",border:"1px solid "+(msg.ok?"#c3e6cb":"#f5c6cb")}}>
+                <p style={{fontFamily:T.sans,fontSize:13,color:msg.ok?"#2d6a2d":"#721c24"}}>{msg.text}</p>
+              </div>
+            )}
+            <BtnPrimary onClick={salvar} loading={loading}>Salvar nova senha</BtnPrimary>
+          </div>
+        }
+      />
+    </div>
+  );
+}
+
 // -- APP -----------------------------------------------------------------------
 function App() {
   const [page, setPage] = React.useState(()=>window.location.hash.replace("#","")||"cadastro");
   const [user, setUser] = React.useState(null);
   const [checking, setChecking] = React.useState(true);
+  const [isRecovery, setIsRecovery] = React.useState(false);
 
   React.useEffect(()=>{
-    supabase.auth.getSession().then(({data})=>{setUser(data.session?.user||null);setChecking(false);});
-    supabase.auth.onAuthStateChange((_,s)=>setUser(s?.user||null));
+    // Detecta token de recuperacao na URL (Supabase coloca #access_token=...&type=recovery)
+    const hash = window.location.hash;
+    if (hash.includes("type=recovery") || hash.includes("type=signup")) {
+      setIsRecovery(true);
+      // Limpa o hash da URL para nao ficar visivel
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+
+    supabase.auth.getSession().then(({data})=>{
+      setUser(data.session?.user||null);
+      setChecking(false);
+    });
+
+    supabase.auth.onAuthStateChange((event, s)=>{
+      setUser(s?.user||null);
+      if (event === "PASSWORD_RECOVERY") {
+        setIsRecovery(true);
+      }
+    });
   },[]);
-  React.useEffect(()=>{window.location.hash=page;},[page]);
+
+  React.useEffect(()=>{
+    if (!isRecovery) window.location.hash=page;
+  },[page, isRecovery]);
 
   function handleLogin(u){setUser(u);setPage(CONFIG.ADMIN_EMAILS.includes(u.email)?"admin":"painel");}
   async function handleLogout(){await supabase.auth.signOut();setUser(null);setPage("login");}
+  function handleRecoveryConcluido(){setIsRecovery(false);setPage("login");}
 
   if(checking) return <Spinner/>;
+  if(isRecovery && user) return <PageRedefinirSenha onConcluido={handleRecoveryConcluido}/>;
   if(page==="cadastro") return <PageCadastro onNavigate={setPage}/>;
   if(page==="login") return <PageLogin onLogin={handleLogin} onNavigate={setPage}/>;
   if(page==="painel") return user?<PagePainel user={user} onLogout={handleLogout}/>:<PageLogin onLogin={handleLogin} onNavigate={setPage}/>;
