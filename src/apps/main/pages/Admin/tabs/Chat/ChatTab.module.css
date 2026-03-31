@@ -1,0 +1,235 @@
+.container {
+  display: flex;
+  height: calc(100vh - 160px);
+  font-family: 'Questrial', sans-serif;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 280px;
+  min-width: 280px;
+  border-right: 1px solid #e8e8e8;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+}
+
+.sidebarSearch {
+  padding: 12px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  border-color: #000;
+}
+
+.convList {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.convItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.15s;
+}
+
+.convItem:hover {
+  background: #f0f0f0;
+}
+
+.convItemActive {
+  background: #e8e8e8;
+}
+
+.convInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.convName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #000;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.convPreview {
+  font-size: 11px;
+  color: #888;
+  margin: 2px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.convMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.convDate {
+  font-size: 10px;
+  color: #aaa;
+}
+
+.unreadBadge {
+  background: #000;
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* ── Chat panel ── */
+.chatPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.chatEmpty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
+  font-size: 14px;
+}
+
+.chatHeader {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e8e8e8;
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+.chatHeaderPhone {
+  font-size: 11px;
+  color: #888;
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bubbleRow {
+  display: flex;
+}
+
+.bubbleRowSent {
+  justify-content: flex-end;
+}
+
+.bubbleRowReceived {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: 65%;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.bubbleSent {
+  background: #000;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.bubbleReceived {
+  background: #f0f0f0;
+  color: #000;
+  border-bottom-left-radius: 4px;
+}
+
+.bubbleTime {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* ── Input bar ── */
+.inputBar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #e8e8e8;
+  background: #fafafa;
+}
+
+.msgInput {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  outline: none;
+  resize: none;
+}
+
+.msgInput:focus {
+  border-color: #000;
+}
+
+.sendBtn {
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.sendBtn:hover {
+  opacity: 0.8;
+}
+
+.sendBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

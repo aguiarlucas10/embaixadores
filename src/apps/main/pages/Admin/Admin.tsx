@@ -13,6 +13,8 @@ import { BtnPrimary, BtnSecondary, BtnGhost } from '@shared/components/atoms/But
 import { Input } from '@shared/components/atoms/Input/Input'
 import { BarChartSVG } from '@shared/components/charts/BarChartSVG/BarChartSVG'
 import { ComboChartSVG } from '@shared/components/charts/ComboChartSVG/ComboChartSVG'
+import { ChatTab } from './tabs/Chat/ChatTab'
+import { WhatsAppTab } from './tabs/WhatsApp/WhatsAppTab'
 import styles from './Admin.module.css'
 
 const COMISSAO_PCT = Number(import.meta.env['VITE_COMISSAO_PCT'] ?? 0.1)
@@ -390,7 +392,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
 
   if (loading) return <div className={styles.page}><Header user={user} onLogout={onLogout} isAdmin /><Spinner /></div>
 
-  const tabLabels = { dashboard: 'Dashboard', embaixadores: `Embaixadores (${embs.length})`, resgates: ress.length > 0 ? `Resgates (${ress.length})` : 'Resgates', fila: `Fila (${fila.length})`, financeiro: 'Financeiro', whatsapp: unread > 0 ? `WhatsApp (${unread})` : 'WhatsApp', importar: 'Importar', 'pré-estreia': 'Pré-estreia', chat: unread > 0 ? `Chat (${unread})` : 'Chat' }
+  const tabLabels = { dashboard: 'Dashboard', embaixadores: `Embaixadores (${embs.length})`, resgates: ress.length > 0 ? `Resgates (${ress.length})` : 'Resgates', fila: `Fila (${fila.length})`, financeiro: 'Financeiro', banner: 'Banner', whatsapp: unread > 0 ? `WhatsApp (${unread})` : 'WhatsApp', chat: unread > 0 ? `Chat (${unread})` : 'Chat', importar: 'Importar', 'pré-estreia': 'Pré-estreia' }
 
   return (
     <div className={styles.page}>
@@ -411,7 +413,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
         </div>
 
         <Tabs
-          tabs={['dashboard', 'embaixadores', 'resgates', 'fila', 'financeiro', 'whatsapp', 'importar', 'pré-estreia', 'chat']}
+          tabs={['dashboard', 'embaixadores', 'resgates', 'fila', 'financeiro', 'banner', 'whatsapp', 'chat', 'importar', 'pré-estreia']}
           labels={tabLabels}
           active={tab}
           onChange={setTab}
@@ -720,7 +722,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
           )}
 
           {/* ─── BANNER ─── */}
-          {tab === 'whatsapp' && (
+          {tab === 'banner' && (
             <div className="fade-in">
               <div className={`banner-admin-wrap ${styles.bannerSection}`}>
                 <p className={styles.sectionTitle}>Banner ativo</p>
@@ -766,13 +768,11 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
             </div>
           )}
 
+          {/* ─── WHATSAPP ─── */}
+          {tab === 'whatsapp' && <WhatsAppTab embs={embs} />}
+
           {/* ─── CHAT ─── */}
-          {tab === 'chat' && (
-            <div className="fade-in">
-              <p className={styles.sectionTitle}>Chat WhatsApp</p>
-              <p className={styles.empty}>Funcionalidade disponível no arquivo legado. Em desenvolvimento na nova versão.</p>
-            </div>
-          )}
+          {tab === 'chat' && <ChatTab embs={embs} onUnread={setUnread} />}
         </Tabs>
       </div>
     </div>
