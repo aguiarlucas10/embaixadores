@@ -1,0 +1,16 @@
+.brand {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #000;
+}
+
+.sub {
+  font-family: 'Questrial', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #a0a0a0;
+  margin-top: 1px;
+}

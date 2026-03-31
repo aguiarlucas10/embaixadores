@@ -1,0 +1,80 @@
+.page {
+  min-height: 100vh;
+  background: #fff;
+}
+
+.leftContent {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.tagline {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #707070;
+  margin-bottom: 40px;
+}
+
+.heroTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(38px, 5vw, 52px);
+  font-weight: 300;
+  color: #000;
+  line-height: 1.08;
+}
+
+.rightContent {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.sectionLabel {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 48px;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-bottom: 40px;
+}
+
+.alertWrap {
+  margin-bottom: 24px;
+}
+
+.footerNote {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #a0a0a0;
+  margin-top: 20px;
+  text-align: center;
+}
+
+.hint {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  color: #707070;
+  line-height: 1.8;
+  margin-bottom: 32px;
+}
+
+.infoBox {
+  padding: 24px;
+  background: #f9f6f2;
+  margin-bottom: 32px;
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  color: #404040;
+  line-height: 1.8;
+}

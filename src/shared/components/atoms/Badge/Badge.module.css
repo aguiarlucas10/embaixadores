@@ -1,0 +1,9 @@
+.badge {
+  font-family: 'Questrial', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  display: inline-block;
+}

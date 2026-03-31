@@ -1,0 +1,28 @@
+.grid {
+  display: grid;
+  gap: 1px;
+  background: #e8e8e8;
+  margin-bottom: 40px;
+}
+
+.item {
+  background: #fff;
+  padding: 20px 16px;
+}
+
+.val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 30px;
+  font-weight: 400;
+  color: #000;
+  line-height: 1;
+}
+
+.label {
+  font-family: 'Questrial', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #a0a0a0;
+  margin-top: 5px;
+}

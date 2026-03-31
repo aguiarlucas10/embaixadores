@@ -1,0 +1,366 @@
+.page {
+  min-height: 100vh;
+  background: #fff;
+}
+
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 32px 80px;
+}
+
+.notFound {
+  max-width: 480px;
+  margin: 64px auto;
+  padding: 0 24px;
+}
+
+.banner {
+  margin-bottom: 40px;
+  overflow: hidden;
+}
+
+.bannerCaption {
+  padding: 12px 16px;
+  background: #f9f9f9;
+  border-top: 1px solid #e8e8e8;
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #707070;
+  line-height: 1.7;
+}
+
+.greeting {
+  margin-bottom: 40px;
+}
+
+.greetingTag {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #a0a0a0;
+  margin-bottom: 6px;
+}
+
+.greetingTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 36px;
+  font-weight: 300;
+}
+
+.cupomBar {
+  background: #000;
+  padding: 24px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 40px;
+}
+
+.cupomLabel {
+  font-family: 'Questrial', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #707070;
+  margin-bottom: 6px;
+}
+
+.cupomCode {
+  font-family: 'Questrial', sans-serif;
+  font-size: 28px;
+  letter-spacing: 0.22em;
+  color: #fff;
+}
+
+.cupomCopy {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.cupomCopy:hover {
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.grupoVip {
+  margin-bottom: 40px;
+}
+
+.grupoVipLink {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid #000;
+  color: #000;
+  padding: 14px 28px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: background 0.15s, color 0.15s;
+}
+
+.grupoVipLink:hover {
+  background: #000;
+  color: #fff;
+}
+
+/* Tab content */
+.tabHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.tabLabel {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.empty {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  color: #a0a0a0;
+  padding-top: 16px;
+  line-height: 1.7;
+}
+
+.syncSpinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #a0a0a0;
+  border-top-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.rowTitle {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+}
+
+.rowSub {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #a0a0a0;
+  margin-top: 2px;
+}
+
+.rowRight {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.rowValue {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 300;
+}
+
+/* Resgate */
+.saldoWrap {
+  margin-bottom: 32px;
+}
+
+.saldoLabel {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #a0a0a0;
+  margin-bottom: 8px;
+}
+
+.saldoValue {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 64px;
+  font-weight: 300;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.saldoPend {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #a0a0a0;
+  margin-top: 4px;
+}
+
+.resgateInfo {
+  background: #f9f6f2;
+  padding: 20px 24px;
+  margin-bottom: 36px;
+  border-left: 3px solid #000;
+}
+
+.resgateInfoTitle {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.resgateInfoText {
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #707070;
+  line-height: 1.9;
+}
+
+.alertWrap {
+  margin-bottom: 24px;
+}
+
+.irParaPerfil {
+  margin-top: 12px;
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid #000;
+  padding: 10px 24px;
+  cursor: pointer;
+  display: block;
+}
+
+.resgateForm {
+  max-width: 400px;
+  margin-bottom: 48px;
+}
+
+.resgateFormLabel {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.tipoBtns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid #000;
+  margin-bottom: 28px;
+}
+
+.tipoBtn {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 14px;
+  border: none;
+  cursor: pointer;
+  background: #fff;
+  color: #000;
+  transition: all 0.15s;
+}
+
+.tipoBtnActive {
+  background: #000;
+  color: #fff;
+}
+
+.pixInfo {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #f9f6f2;
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #707070;
+}
+
+.alterarPix {
+  margin-top: 4px;
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  color: #a0a0a0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  display: block;
+}
+
+.valorResgate {
+  margin-bottom: 28px;
+  padding: 12px 16px;
+  background: #f0f0f0;
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #707070;
+}
+
+.valorDestaque {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px;
+  color: #000;
+}
+
+.resgateNote {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #a0a0a0;
+  margin-top: 12px;
+  line-height: 1.8;
+}
+
+.historicoResgates {
+  margin-top: 32px;
+}
+
+/* Perfil */
+.perfilWrap {
+  max-width: 560px;
+}
+
+.perfilSection {
+  margin-bottom: 48px;
+}
+
+.perfilSectionBorder {
+  border-top: 1px solid #e8e8e8;
+  padding-top: 40px;
+}
+
+.perfilFields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.indicarLink {
+  background: #f5f5f5;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #707070;
+  word-break: break-all;
+}

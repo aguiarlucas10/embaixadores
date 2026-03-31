@@ -1,0 +1,222 @@
+/* Reset & base */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Questrial', sans-serif;
+  background: #fff;
+  color: #000;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+input[type='checkbox'] {
+  accent-color: #000;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+textarea {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #fff;
+}
+::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 2px;
+}
+
+/* Keyframes globais */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes heroReveal {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Utility classes */
+.fade-up {
+  animation: fadeUp 0.5s ease forwards;
+}
+.fade-in {
+  animation: fadeIn 0.25s ease both;
+}
+.stagger > * {
+  opacity: 0;
+  animation: fadeUp 0.5s ease forwards;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger > *:nth-child(2) { animation-delay: 0.10s; }
+.stagger > *:nth-child(3) { animation-delay: 0.16s; }
+.stagger > *:nth-child(4) { animation-delay: 0.22s; }
+.stagger > *:nth-child(5) { animation-delay: 0.28s; }
+.stagger > *:nth-child(6) { animation-delay: 0.34s; }
+
+/* Landing page */
+.lp-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 73s linear infinite;
+}
+.lp-hero-title {
+  animation: heroReveal 1s ease 0.3s both;
+}
+.lp-hero-sub {
+  animation: heroReveal 1s ease 0.6s both;
+}
+.lp-hero-btn {
+  animation: heroReveal 1s ease 0.85s both;
+}
+.lp-benefit-card:hover {
+  transform: translateY(-4px);
+  transition: transform 0.3s ease;
+}
+.lp-faq-item summary {
+  cursor: pointer;
+  list-style: none;
+}
+.lp-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Form / input interactions */
+.sg-input:focus {
+  border-bottom: 2px solid #000 !important;
+  outline: none;
+}
+.sg-btn-primary:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.sg-btn-secondary:hover {
+  background: #000 !important;
+  color: #fff !important;
+}
+.sg-btn-ghost:hover {
+  color: #000 !important;
+}
+.sg-tab:hover {
+  color: #000 !important;
+}
+
+/* Layout helpers */
+.tabs-bar {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .split-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .split-left {
+    display: none !important;
+  }
+  .split-right {
+    padding: 40px 20px !important;
+  }
+  .painel-wrap {
+    padding: 24px 16px 100px !important;
+    max-width: 100% !important;
+  }
+  .stat-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .stat-item {
+    padding: 16px 10px !important;
+  }
+  .stat-val {
+    font-size: 20px !important;
+  }
+  .cupom-bar {
+    padding: 18px 20px !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    align-items: flex-start !important;
+  }
+  .cupom-code {
+    font-size: 20px !important;
+    letter-spacing: 0.15em !important;
+  }
+  .nivel-row {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .nivel-row h2 {
+    font-size: 26px !important;
+  }
+  .progress-wrap {
+    max-width: 100% !important;
+  }
+  .header-bar {
+    padding: 0 16px !important;
+  }
+  .row-item {
+    padding: 14px 0 !important;
+  }
+  .admin-wrap {
+    padding: 24px 16px 80px !important;
+    max-width: 100% !important;
+  }
+}

@@ -1,0 +1,283 @@
+.page {
+  min-height: 100vh;
+  background: #fff;
+}
+
+.wrap {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+.bannerWrap {
+  overflow: hidden;
+}
+
+.bannerImg {
+  width: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.bannerCaption {
+  padding: 12px 16px;
+  background: #f9f9f9;
+  border-top: 1px solid #e8e8e8;
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #707070;
+  line-height: 1.7;
+}
+
+.greeting {
+  margin-bottom: 40px;
+}
+
+.greetingTag {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #a0a0a0;
+  margin-bottom: 4px;
+}
+
+.greetingTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 36px;
+  font-weight: 300;
+  margin-bottom: 4px;
+}
+
+.greetingCupom {
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #a0a0a0;
+}
+
+.cupomCode {
+  color: #000;
+  letter-spacing: 0.12em;
+}
+
+/* Resgate box */
+.resgateBox {
+  margin-bottom: 48px;
+  padding: 24px;
+  border: 1px solid #e8e8e8;
+}
+
+.boxTitle {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.resgateInfo {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  color: #707070;
+  line-height: 1.7;
+}
+
+.resgateValorText {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+
+.resgateValor {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  font-weight: 300;
+}
+
+.resgatePixInfo {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #a0a0a0;
+  margin-bottom: 20px;
+}
+
+.msgWrap {
+  margin-top: 16px;
+}
+
+/* Sections */
+.section {
+  margin-bottom: 48px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.syncBtn {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid #e8e8e8;
+  padding: 8px 14px;
+  cursor: pointer;
+  color: #707070;
+  transition: border-color 0.15s;
+}
+
+.syncBtn:hover:not(:disabled) {
+  border-color: #000;
+}
+
+.syncBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.empty {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  color: #a0a0a0;
+}
+
+/* Table */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Questrial', sans-serif;
+}
+
+.thead tr {
+  border-bottom: 2px solid #000;
+}
+
+.th {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #a0a0a0;
+  font-weight: 400;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.tr {
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.trAlt {
+  background: #fafafa;
+}
+
+.td {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #707070;
+}
+
+.tdComissao {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px;
+  font-weight: 300;
+  color: #2a9d5c;
+}
+
+/* Resgate rows */
+.resgateRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.rowSub {
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #707070;
+  margin-bottom: 2px;
+}
+
+.resgateRowRight {
+  text-align: right;
+}
+
+.resgateRowVal {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  font-weight: 300;
+  margin-bottom: 4px;
+}
+
+/* Perfil */
+.perfilSection {
+  border-top: 1px solid #e8e8e8;
+  padding-top: 40px;
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.editActions {
+  display: flex;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.perfilRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.perfilRow {
+  display: flex;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.perfilLabel {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #a0a0a0;
+  width: 100px;
+  flex-shrink: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.perfilVal {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+}
+
+.editBtn {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid #e8e8e8;
+  padding: 8px 14px;
+  cursor: pointer;
+  color: #707070;
+}
