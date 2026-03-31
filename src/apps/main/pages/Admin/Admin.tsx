@@ -306,12 +306,11 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     try {
       const ext = file.name.split('.').pop()
       const path = `banners/banner_ativo.${ext}`
-      const { error: upErr } = await supabase.storage.from('assets').upload(path, file, { upsert: true, contentType: file.type })
-      if (upErr) { setMsgBanner({ text: 'Erro no upload: ' + upErr.message, ok: false }); setUploadando(false); return }
-      const { data: urlData } = supabase.storage.from('assets').getPublicUrl(path)
-      const url = urlData.publicUrl
-      await supabase.from('config').upsert({ chave: 'banner_ativo', valor: url }, { onConflict: 'chave' })
-      setBanner(url); setBannerPreview(null)
+      const { uploadBanner } = await import('@shared/services/storageProxy')
+      const result = await uploadBanner(file, 'assets', path)
+      if ('error' in result) { setMsgBanner({ text: result.error, ok: false }); setUploadando(false); return }
+      await supabase.from('config').upsert({ chave: 'banner_ativo', valor: result.url }, { onConflict: 'chave' })
+      setBanner(result.url); setBannerPreview(null)
       setMsgBanner({ text: 'Banner atualizado com sucesso!', ok: true })
     } catch (err) { setMsgBanner({ text: 'Erro inesperado: ' + String(err), ok: false }) }
     setUploadando(false)

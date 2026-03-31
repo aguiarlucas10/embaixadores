@@ -229,12 +229,11 @@ export function PageAdminSG({ user, onLogout }: AdminSGProps) {
     setBannerPreview(URL.createObjectURL(file))
     const ext = file.name.split('.').pop()
     const path = `banners-sg/banner-sg-${Date.now()}.${ext}`
-    const { error: upErr } = await supabase.storage.from('banners').upload(path, file, { upsert: true })
-    if (upErr) { setMsgBanner({ text: 'Erro no upload: ' + upErr.message, ok: false }); setUploadando(false); return }
-    const { data: pub } = supabase.storage.from('banners').getPublicUrl(path)
-    const url = pub.publicUrl
-    await supabase.from('config').upsert({ chave: 'banner_sg_ativo', valor: url }, { onConflict: 'chave' })
-    setBanner(url); setBannerPreview(null)
+    const { uploadBanner } = await import('@shared/services/storageProxy')
+    const result = await uploadBanner(file, 'banners', path)
+    if ('error' in result) { setMsgBanner({ text: result.error, ok: false }); setUploadando(false); return }
+    await supabase.from('config').upsert({ chave: 'banner_sg_ativo', valor: result.url }, { onConflict: 'chave' })
+    setBanner(result.url); setBannerPreview(null)
     setMsgBanner({ text: 'Banner atualizado!', ok: true })
     setUploadando(false)
   }
