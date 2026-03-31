@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Importar Comissões via CSV — Saint Germain</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', monospace; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; padding: 40px 24px; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  .brand { font-size: 10px; letter-spacing: 0.35em; text-transform: uppercase; color: #555; margin-bottom: 6px; }
+  .title { font-family: 'Georgia', serif; font-size: 32px; font-weight: normal; color: #fff; letter-spacing: 0.02em; }
+  .subtitle { font-size: 11px; letter-spacing: 0.15em; color: #555; margin-top: 6px; text-transform: uppercase; margin-bottom: 40px; }
+
+  .config-panel { border: 1px solid #222; padding: 28px 32px; margin-bottom: 20px; background: #111; }
+  .config-label { font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: #555; margin-bottom: 14px; display: block; }
+  .config-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: #555; }
+  .field input { background: #0a0a0a; border: 1px solid #2a2a2a; color: #e0e0e0; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px 12px; outline: none; transition: border-color 0.15s; width: 100%; }
+  .field input:focus { border-color: #555; }
+
+  .upload-zone {
+    border: 1px dashed #333; padding: 32px; text-align: center; margin-bottom: 20px;
+    cursor: pointer; transition: border-color 0.2s; background: #0d0d0d;
+  }
+  .upload-zone:hover, .upload-zone.dragover { border-color: #666; }
+  .upload-zone.loaded { border-color: #3a9d5c; border-style: solid; }
+  .upload-label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #555; margin-bottom: 8px; }
+  .upload-filename { font-size: 13px; color: #3a9d5c; margin-top: 8px; }
+  #fileInput { display: none; }
+
+  .warn-box { background: #1a1200; border: 1px solid #3a2800; padding: 14px 18px; margin-bottom: 20px; font-size: 11px; color: #c8900a; line-height: 1.7; }
+  .warn-box strong { color: #f0a820; }
+
+  .btn-run { background: #fff; color: #000; border: none; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; padding: 16px 40px; cursor: pointer; transition: opacity 0.15s; display: inline-flex; align-items: center; gap: 10px; }
+  .btn-run:hover:not(:disabled) { opacity: 0.85; }
+  .btn-run:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-secondary { background: transparent; color: #555; border: 1px solid #2a2a2a; font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; padding: 12px 24px; cursor: pointer; transition: all 0.15s; margin-left: 12px; }
+  .btn-secondary:hover:not(:disabled) { color: #aaa; border-color: #444; }
+  .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .stats-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: #222; border: 1px solid #222; margin-bottom: 28px; opacity: 0; transition: opacity 0.3s; }
+  .stats-bar.visible { opacity: 1; }
+  .stat { background: #111; padding: 18px 16px; text-align: center; }
+  .stat-val { font-family: 'Georgia', serif; font-size: 26px; font-weight: normal; color: #fff; margin-bottom: 4px; }
+  .stat-val.green { color: #3a9d5c; }
+  .stat-val.yellow { color: #c8900a; }
+  .stat-lbl { font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: #555; }
+
+  .progress-wrap { margin-bottom: 28px; display: none; }
+  .progress-wrap.visible { display: block; }
+  .progress-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .progress-label { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: #555; }
+  .progress-pct { font-size: 9px; color: #777; }
+  .progress-track { height: 2px; background: #1a1a1a; }
+  .progress-fill { height: 2px; background: #fff; width: 0%; transition: width 0.4s ease; }
+
+  .terminal { background: #050505; border: 1px solid #1a1a1a; padding: 20px 24px; height: 380px; overflow-y: auto; font-size: 12px; line-height: 1.8; display: none; }
+  .terminal.visible { display: block; }
+  .log-line { display: flex; gap: 12px; }
+  .log-time { color: #333; flex-shrink: 0; user-select: none; }
+  .log-msg { color: #888; }
+  .log-msg.ok { color: #3a9d5c; }
+  .log-msg.warn { color: #c8900a; }
+  .log-msg.error { color: #c03030; }
+  .log-msg.head { color: #ccc; font-weight: bold; }
+  .log-msg.dim { color: #444; }
+
+  .result-box { border: 1px solid #1a3a1a; background: #0a1a0a; padding: 24px 28px; margin-top: 20px; display: none; }
+  .result-box.visible { display: block; }
+  .result-title { font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: #3a9d5c; margin-bottom: 12px; }
+  .result-body { font-family: 'Georgia', serif; font-size: 18px; color: #fff; line-height: 1.8; }
+  .result-body span { color: #3a9d5c; }
+
+  .preview-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; display: none; }
+  .preview-table.visible { display: table; }
+  .preview-table th { font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase; color: #555; padding: 8px 10px; text-align: left; border-bottom: 1px solid #222; }
+  .preview-table td { padding: 8px 10px; border-bottom: 1px solid #111; color: #888; font-size: 11px; }
+  .preview-table td.green { color: #3a9d5c; }
+  .preview-table td.yellow { color: #c8900a; }
+  .preview-table td.dim { color: #333; }
+  .preview-table tr:hover td { background: #111; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 12px; height: 12px; border: 1.5px solid #555; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <p class="brand">Saint Germain — Portal Embaixadoras</p>
+    <h1 class="title">Importar Comissões via CSV</h1>
+    <p class="subtitle">Upload do relatório de vendas da Nuvemshop</p>
+  </div>
+
+  <!-- Upload -->
+  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+    <p class="upload-label">Arraste o CSV aqui ou clique para selecionar</p>
+    <p style="font-size:10px;color:#444;margin-top:4px">Arquivo exportado pelo painel Nuvemshop — separador ponto e vírgula</p>
+    <p class="upload-filename" id="uploadFilename"></p>
+    <input type="file" id="fileInput" accept=".csv"/>
+  </div>
+
+  <!-- Config -->
+  <div class="config-panel">
+    <span class="config-label">Configuração</span>
+    <div class="config-row">
+      <div class="field">
+        <label>Prefixo dos cupons</label>
+        <input type="text" id="prefixo" value="SGB"/>
+      </div>
+      <div class="field">
+        <label>% de comissão</label>
+        <input type="number" id="comissaoPct" value="10" min="1" max="100" step="0.1"/>
+      </div>
+    </div>
+    <div class="config-row">
+      <div class="field">
+        <label>Janela de devolução (dias)</label>
+        <input type="number" id="janelaDev" value="1" min="0" max="60"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn-box">
+    <strong>⚠ Atenção:</strong> O script verifica <strong>pedido_id existente</strong> antes de inserir — pedidos já cadastrados serão <strong>ignorados automaticamente</strong>, sem risco de duplicação.
+  </div>
+
+  <!-- Preview -->
+  <table class="preview-table" id="previewTable">
+    <thead>
+      <tr>
+        <th>Data</th><th>Pedido ID</th><th>Cupom</th><th>Total</th><th>Comissão</th><th>Status</th><th>Embaixadora</th>
+      </tr>
+    </thead>
+    <tbody id="previewBody"></tbody>
+  </table>
+
+  <!-- Actions -->
+  <div style="margin-bottom:28px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;" id="actionBar" style="display:none">
+    <button class="btn-run" id="btnDry" onclick="rodar(true)" disabled>Simular (dry-run)</button>
+    <button class="btn-secondary" id="btnReal" onclick="rodar(false)" disabled>Importar de verdade</button>
+    <button class="btn-secondary" id="btnReset" onclick="resetar()" style="display:none">Resetar</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat"><div class="stat-val" id="sPedidos">—</div><div class="stat-lbl">Pedidos no CSV</div></div>
+    <div class="stat"><div class="stat-val" id="sMatch">—</div><div class="stat-lbl">Com cupom SGB</div></div>
+    <div class="stat"><div class="stat-val green" id="sNovos">—</div><div class="stat-lbl">Novos para importar</div></div>
+    <div class="stat"><div class="stat-val yellow" id="sDupl">—</div><div class="stat-lbl">Já existiam</div></div>
+    <div class="stat"><div class="stat-val" id="sFat">—</div><div class="stat-lbl">Faturamento total</div></div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-header">
+      <span class="progress-label" id="progressLabel">Processando...</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="terminal" id="terminal"></div>
+
+  <!-- Result -->
+  <div class="result-box" id="resultBox">
+    <p class="result-title">✓ Concluído</p>
+    <p class="result-body" id="resultBody"></p>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const SUPABASE_URL  = "https://fsfqnshkfwnfeswwdmxg.supabase.co";
+const SUPABASE_ANON = "sb_publishable_dH1eUToHUyYejRkHmKwQRw_5qVlMX4E";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ============================================================
+// HELPERS
+// ============================================================
+const brl = v => "R$ " + Number(v||0).toLocaleString("pt-BR", {minimumFractionDigits:2});
+const now = () => new Date().toTimeString().slice(0,8);
+
+function log(msg, tipo="info") {
+  const t = document.getElementById("terminal");
+  const line = document.createElement("div");
+  line.className = "log-line";
+  line.innerHTML = `<span class="log-time">${now()}</span><span class="log-msg ${tipo}">${msg}</span>`;
+  t.appendChild(line);
+  t.scrollTop = t.scrollHeight;
+}
+
+function setStat(id, val, cls) {
+  const el = document.getElementById(id);
+  el.textContent = val;
+  if (cls) el.className = "stat-val " + cls;
+}
+
+function setProgress(pct, label) {
+  document.getElementById("progressFill").style.width = pct + "%";
+  document.getElementById("progressPct").textContent = Math.round(pct) + "%";
+  if (label) document.getElementById("progressLabel").textContent = label;
+}
+
+function diasPassados(dateStr, n) {
+  return (Date.now() - new Date(dateStr).getTime()) / 86400000 >= n;
+}
+
+// ============================================================
+// PARSE CSV (formato Nuvemshop — separador ;, encoding latin-1)
+// ============================================================
+function parseCSV(text) {
+  const linhas = text.split(/\r?\n/);
+  if (linhas.length < 2) return [];
+
+  // Detectar separador
+  const sep = linhas[0].includes(';') ? ';' : ',';
+  const header = linhas[0].split(sep).map(h => h.trim().replace(/^"|"$/g,''));
+
+  const get = (row, ...keys) => {
+    for (const k of keys) {
+      const i = header.findIndex(h => h.toLowerCase().includes(k.toLowerCase()));
+      if (i >= 0 && row[i] !== undefined) return row[i].trim().replace(/^"|"$/g,'');
+    }
+    return '';
+  };
+
+  const pedidos = {};
+
+  for (let i = 1; i < linhas.length; i++) {
+    const linha = linhas[i];
+    if (!linha.trim()) continue;
+
+    // Split respeitando campos entre aspas
+    const row = [];
+    let cur = '', inQ = false;
+    for (const ch of linha) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === sep && !inQ) { row.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    row.push(cur.trim());
+
+    const idPedido   = get(row, 'Identificador do pedido');
+    const cupom      = get(row, 'Cupom de Desconto').toUpperCase();
+    const num        = get(row, 'Número do Pedido');
+    const total      = get(row, 'Total');
+    const data       = get(row, 'Data');
+    const statusPgto = get(row, 'Status do Pagamento');
+    const dataPgto   = get(row, 'Data de pagamento');
+
+    if (!idPedido || !cupom.startsWith(prefixo())) continue;
+    if (pedidos[idPedido]) continue; // já registrado (multi-produto)
+
+    // Converter data brasileira DD/MM/YYYY HH:MM:SS → ISO
+    let isoDate = '';
+    const mData = data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (mData) isoDate = `${mData[3]}-${mData[2]}-${mData[1]}T00:00:00-03:00`;
+
+    const valorPedido = parseFloat(total.replace(',','.')) || 0;
+
+    pedidos[idPedido] = {
+      pedido_id:      idPedido,
+      cupom,
+      valor_pedido:   valorPedido,
+      criado_em:      isoDate,
+      payment_status: statusPgto === 'Confirmado' ? 'paid' : statusPgto.toLowerCase(),
+      num,
+    };
+  }
+
+  return Object.values(pedidos);
+}
+
+function prefixo() {
+  return document.getElementById("prefixo").value.trim().toUpperCase();
+}
+
+// ============================================================
+// UPLOAD & PREVIEW
+// ============================================================
+let dadosCSV = [];
+let dryRunResult = null;
+
+const zone = document.getElementById("uploadZone");
+zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("dragover"); });
+zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
+zone.addEventListener("drop", e => {
+  e.preventDefault();
+  zone.classList.remove("dragover");
+  const file = e.dataTransfer.files[0];
+  if (file) processarArquivo(file);
+});
+document.getElementById("fileInput").addEventListener("change", e => {
+  if (e.target.files[0]) processarArquivo(e.target.files[0]);
+});
+
+function processarArquivo(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    // Tenta latin-1 via decode manual
+    const buf = e.target.result;
+    const decoder = new TextDecoder("windows-1252");
+    const text = decoder.decode(buf);
+
+    dadosCSV = parseCSV(text);
+
+    document.getElementById("uploadFilename").textContent = `✓ ${file.name} — ${dadosCSV.length} pedidos com cupom ${prefixo()} encontrados`;
+    zone.classList.add("loaded");
+
+    // Preview
+    renderPreview(dadosCSV);
+
+    document.getElementById("btnDry").disabled = false;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderPreview(pedidos) {
+  const comPct = parseFloat(document.getElementById("comissaoPct").value)/100;
+  const janela = parseInt(document.getElementById("janelaDev").value);
+
+  const tbody = document.getElementById("previewBody");
+  tbody.innerHTML = "";
+
+  for (const p of pedidos.slice(0, 50)) {
+    const com = (p.valor_pedido * comPct).toFixed(2);
+    const status = p.payment_status === 'paid'
+      ? (diasPassados(p.criado_em, janela) ? 'confirmada' : 'pendente')
+      : 'pendente';
+    const dataFmt = p.criado_em ? p.criado_em.slice(0,10).split('-').reverse().join('/') : '—';
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${dataFmt}</td>
+      <td class="dim">#${p.pedido_id}</td>
+      <td style="color:#aaa">${p.cupom}</td>
+      <td>${brl(p.valor_pedido)}</td>
+      <td class="green">${brl(com)}</td>
+      <td class="${status==='confirmada'?'green':'yellow'}">${status}</td>
+      <td class="dim" id="emb_${p.pedido_id}">—</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (pedidos.length > 50) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="7" style="color:#444;text-align:center;padding:12px">... e mais ${pedidos.length-50} pedidos</td>`;
+    tbody.appendChild(tr);
+  }
+
+  document.getElementById("previewTable").className = "preview-table visible";
+  document.getElementById("statsBar").className = "stats-bar visible";
+  setStat("sPedidos", pedidos.length);
+  setStat("sMatch", pedidos.length);
+  const fat = pedidos.reduce((s,p)=>s+p.valor_pedido,0);
+  setStat("sFat", brl(fat));
+}
+
+// ============================================================
+// MAIN
+// ============================================================
+async function rodar(isDry) {
+  if (!dadosCSV.length) { alert("Carregue um arquivo CSV primeiro."); return; }
+
+  const comPct = parseFloat(document.getElementById("comissaoPct").value)/100;
+  const janela = parseInt(document.getElementById("janelaDev").value);
+
+  // UI
+  document.getElementById("btnDry").disabled  = true;
+  document.getElementById("btnReal").disabled = true;
+  document.getElementById("terminal").className = "terminal visible";
+  document.getElementById("progressWrap").className = "progress-wrap visible";
+  document.getElementById("resultBox").className = "result-box";
+
+  log(isDry ? "=== MODO SIMULAÇÃO (nada será salvo) ===" : "=== IMPORTAÇÃO REAL ===", "head");
+  log(`${dadosCSV.length} pedidos com cupom ${prefixo()} carregados do CSV.`, "info");
+
+  setProgress(10, "Carregando embaixadoras do Supabase...");
+
+  // ---- 1. Carregar embaixadoras ----
+  const { data: embs, error: embErr } = await sb.from("embaixadores").select("id, cupom");
+  if (embErr) { log("ERRO ao carregar embaixadoras: " + embErr.message, "error"); return; }
+
+  const mapaEmb = {};
+  (embs||[]).forEach(e => { if (e.cupom) mapaEmb[e.cupom.toUpperCase()] = e.id; });
+  log(`${Object.keys(mapaEmb).length} embaixadoras carregadas.`, "ok");
+
+  setProgress(25, "Verificando duplicatas no Supabase...");
+
+  // ---- 2. Checar existentes ----
+  const ids = dadosCSV.map(p => p.pedido_id);
+  const { data: jaExist } = await sb.from("comissoes").select("pedido_id").in("pedido_id", ids);
+  const existSet = new Set((jaExist||[]).map(x => x.pedido_id));
+
+  const novos = dadosCSV.filter(p => !existSet.has(p.pedido_id));
+  const dupls = dadosCSV.filter(p =>  existSet.has(p.pedido_id));
+
+  setStat("sNovos", novos.length, novos.length > 0 ? "green" : "");
+  setStat("sDupl",  dupls.length, dupls.length > 0 ? "yellow" : "");
+
+  log(`${novos.length} novos para importar, ${dupls.length} já existiam.`, "ok");
+
+  setProgress(40, "Preparando registros...");
+
+  // ---- 3. Montar registros ----
+  let semEmbaixadora = 0;
+  const paraImportar = [];
+
+  for (const p of novos) {
+    const embId = mapaEmb[p.cupom];
+    if (!embId) {
+      log(`⚠  #${p.pedido_id} — cupom "${p.cupom}" sem embaixadora cadastrada. Ignorando.`, "warn");
+      semEmbaixadora++;
+      continue;
+    }
+
+    const status = p.payment_status === 'paid'
+      ? (diasPassados(p.criado_em, janela) ? 'confirmada' : 'pendente')
+      : 'pendente';
+
+    const rec = {
+      embaixador_id:  embId,
+      pedido_id:      p.pedido_id,
+      valor_pedido:   p.valor_pedido,
+      valor_comissao: parseFloat((p.valor_pedido * comPct).toFixed(2)),
+      status,
+      payment_status: p.payment_status,
+      criado_em:      p.criado_em,
+      resgatada:      false,
+    };
+
+    paraImportar.push(rec);
+
+    // Atualizar preview com nome da embaixadora
+    const embNome = (embs||[]).find(e => e.id === embId);
+    const cell = document.getElementById("emb_" + p.pedido_id);
+    if (cell) cell.textContent = embNome?.cupom || embId.slice(0,8);
+
+    log(`  #${p.pedido_id} | ${p.cupom} | ${brl(p.valor_pedido)} | ${p.payment_status} → ${status}`, "info");
+  }
+
+  if (semEmbaixadora > 0) log(`${semEmbaixadora} pedido(s) sem embaixadora correspondente.`, "warn");
+  log("", "dim");
+
+  // ---- 4. Dry-run ----
+  if (isDry) {
+    dryRunResult = paraImportar;
+    setProgress(100, "Simulação concluída");
+    log("=== SIMULAÇÃO CONCLUÍDA ===", "head");
+    log(`${paraImportar.length} registros seriam criados.`, "ok");
+    if (paraImportar.length > 0) {
+      log(`Clique em "Importar de verdade" para confirmar.`, "info");
+      document.getElementById("btnReal").disabled = false;
+    }
+    document.getElementById("btnDry").disabled = false;
+    document.getElementById("btnReset").style.display = "inline-block";
+    return;
+  }
+
+  // ---- 5. Importação real ----
+  if (!paraImportar.length) {
+    log("Nada a importar.", "warn");
+    setProgress(100, "Concluído");
+    return;
+  }
+
+  log(`Importando ${paraImportar.length} registros...`, "head");
+  let importados = 0, erros = 0;
+
+  for (let i = 0; i < paraImportar.length; i++) {
+    setProgress(50 + ((i / paraImportar.length) * 50), `Importando ${i+1}/${paraImportar.length}...`);
+    const { error } = await sb.from("comissoes").insert(paraImportar[i]);
+    if (error) {
+      log(`  ERRO #${paraImportar[i].pedido_id}: ${error.message}`, "error");
+      erros++;
+    } else {
+      importados++;
+    }
+  }
+
+  setProgress(100, "Importação concluída");
+  log("", "dim");
+  log("=== IMPORTAÇÃO CONCLUÍDA ===", "head");
+  log(`${importados} comissões criadas com sucesso.`, "ok");
+  if (erros > 0) log(`${erros} erros.`, "error");
+
+  const totalCom = paraImportar.reduce((s,r)=>s+r.valor_comissao, 0);
+  const totalFat = paraImportar.reduce((s,r)=>s+r.valor_pedido, 0);
+  document.getElementById("resultBody").innerHTML =
+    `<span>${importados}</span> comissões importadas<br/>` +
+    `Faturamento: <span>${brl(totalFat)}</span><br/>` +
+    `Total em comissões: <span>${brl(totalCom)}</span>`;
+  document.getElementById("resultBox").className = "result-box visible";
+  document.getElementById("btnReset").style.display = "inline-block";
+}
+
+function resetar() {
+  dryRunResult = null;
+  dadosCSV = [];
+  document.getElementById("terminal").innerHTML = "";
+  document.getElementById("terminal").className = "terminal";
+  document.getElementById("progressWrap").className = "progress-wrap";
+  document.getElementById("progressFill").style.width = "0%";
+  document.getElementById("resultBox").className = "result-box";
+  document.getElementById("previewTable").className = "preview-table";
+  document.getElementById("previewBody").innerHTML = "";
+  document.getElementById("statsBar").className = "stats-bar";
+  document.getElementById("uploadFilename").textContent = "";
+  document.getElementById("uploadZone").classList.remove("loaded");
+  document.getElementById("fileInput").value = "";
+  document.getElementById("btnDry").disabled = true;
+  document.getElementById("btnReal").disabled = true;
+  document.getElementById("btnReset").style.display = "none";
+  ["sPedidos","sMatch","sNovos","sDupl","sFat"].forEach(id => {
+    document.getElementById(id).textContent = "—";
+    document.getElementById(id).className = "stat-val";
+  });
+}
+</script>
+</body>
+</html>
