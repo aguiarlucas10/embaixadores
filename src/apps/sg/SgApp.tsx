@@ -23,7 +23,8 @@ function PrivateRouteSG({ children, adminOnly = false }: { children: React.React
 function LoginRouteSG({ children }: { children: React.ReactNode }) {
   const { user, checking } = useAuth()
   if (checking) return <Spinner />
-  if (user) return <Navigate to={isAdminEmail(user.email ?? '') ? 'admin' : 'painel'} replace />
+  const isRecovery = window.location.hash.includes('type=recovery')
+  if (user && !isRecovery) return <Navigate to={isAdminEmail(user.email ?? '') ? 'admin' : 'painel'} replace />
   return <>{children}</>
 }
 

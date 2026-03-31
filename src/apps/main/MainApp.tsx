@@ -25,7 +25,9 @@ function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNo
 function LoginRoute({ children }: { children: React.ReactNode }) {
   const { user, checking } = useAuth()
   if (checking) return <Spinner />
-  if (user) return <Navigate to={isAdminEmail(user.email ?? '') ? '/admin' : '/painel'} replace />
+  // Não redirecionar se está em fluxo de recovery (reset de senha)
+  const isRecovery = window.location.hash.includes('type=recovery')
+  if (user && !isRecovery) return <Navigate to={isAdminEmail(user.email ?? '') ? '/admin' : '/painel'} replace />
   return <>{children}</>
 }
 
