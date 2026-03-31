@@ -5,21 +5,25 @@ import { PageLoginSG } from './pages/Login/LoginSG'
 import { PagePainelSG } from './pages/Painel/PainelSG'
 import { PageAdminSG } from './pages/Admin/AdminSG'
 
-// Paths are relative to the parent <Route path="/sg/*">
-// so "login" matches /sg/login, "painel" matches /sg/painel, etc.
+const ADMIN_EMAILS = (import.meta.env['VITE_ADMIN_EMAILS'] as string ?? '')
+  .split(',').map(e => e.trim()).filter(Boolean)
+
+function isAdminEmail(email: string | undefined) {
+  return ADMIN_EMAILS.includes(email ?? '')
+}
 
 function PrivateRouteSG({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
-  const { user, checking, isAdmin } = useAuth()
+  const { user, checking } = useAuth()
   if (checking) return <Spinner />
   if (!user) return <Navigate to="login" replace />
-  if (adminOnly && !isAdmin) return <Navigate to="painel" replace />
+  if (adminOnly && !isAdminEmail(user.email ?? '')) return <Navigate to="painel" replace />
   return <>{children}</>
 }
 
 function LoginRouteSG({ children }: { children: React.ReactNode }) {
-  const { user, checking, isAdmin } = useAuth()
+  const { user, checking } = useAuth()
   if (checking) return <Spinner />
-  if (user) return <Navigate to={isAdmin ? 'admin' : 'painel'} replace />
+  if (user) return <Navigate to={isAdminEmail(user.email ?? '') ? 'admin' : 'painel'} replace />
   return <>{children}</>
 }
 

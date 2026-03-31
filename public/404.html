@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecionando...</title>
+    <script>
+      // SPA redirect for GitHub Pages
+      // Converts /login, /painel, /admin, /sg/* to query string
+      // so index.html can restore the route
+      var seg = window.location.pathname.split('/').filter(Boolean);
+      var path = '/' + seg.join('/');
+      window.location.replace(
+        window.location.origin + '/?route=' + encodeURIComponent(path) + window.location.hash
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

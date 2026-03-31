@@ -9,6 +9,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Questrial&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <script>
+      // SPA restore: if 404.html redirected here with ?route=, push the original path
+      (function() {
+        var q = new URLSearchParams(window.location.search);
+        var route = q.get('route');
+        if (route) {
+          window.history.replaceState(null, '', route + window.location.hash);
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
