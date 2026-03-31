@@ -1,10 +1,14 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import type { User } from '@supabase/supabase-js'
 import { useAuth } from '@shared/hooks/useAuth'
 import { Spinner } from '@shared/components/atoms/Spinner/Spinner'
 import { PageCadastro } from './pages/Cadastro/Cadastro'
 import { LoginPage } from './pages/Login/Login'
 import { PainelPage } from './pages/Painel/Painel'
 import { AdminPage } from './pages/Admin/Admin'
+
+const ADMIN_EMAILS = (import.meta.env['VITE_ADMIN_EMAILS'] as string ?? '')
+  .split(',').map(e => e.trim()).filter(Boolean)
 
 function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
   const { user, checking, isAdmin } = useAuth()
@@ -23,16 +27,15 @@ function LoginRoute({ children }: { children: React.ReactNode }) {
 
 export function MainApp() {
   const navigate = useNavigate()
-  const { user, isAdmin, logout } = useAuth()
+  const { user, logout } = useAuth()
 
   function handleLogout() {
     logout().then(() => navigate('/login'))
   }
 
-  // Called by LoginPage after successful auth — LoginRoute guard will redirect too,
-  // but this gives immediate feedback.
-  function handleLogin() {
-    navigate(isAdmin ? '/admin' : '/painel')
+  function handleLogin(loggedUser: User) {
+    const admin = ADMIN_EMAILS.includes(loggedUser.email ?? '')
+    navigate(admin ? '/admin' : '/painel')
   }
 
   return (

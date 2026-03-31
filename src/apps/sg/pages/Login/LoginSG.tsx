@@ -7,6 +7,9 @@ import { Alert } from '@shared/components/atoms/Alert/Alert'
 import { BtnPrimary } from '@shared/components/atoms/Button/Button'
 import styles from './LoginSG.module.css'
 
+const ADMIN_EMAILS = (import.meta.env['VITE_ADMIN_EMAILS'] as string ?? '')
+  .split(',').map(e => e.trim()).filter(Boolean)
+
 export function PageLoginSG() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -19,9 +22,10 @@ export function PageLoginSG() {
 
   async function entrar() {
     setLoading(true); setErr('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha })
     if (error) { setErr('E-mail ou senha incorretos.'); setLoading(false); return }
-    navigate('/sg/painel')
+    const admin = ADMIN_EMAILS.includes(data.user.email ?? '')
+    navigate(admin ? '/sg/admin' : '/sg/painel')
   }
 
   async function recuperar() {
