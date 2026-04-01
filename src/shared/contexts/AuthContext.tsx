@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useMemo } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@shared/services/supabase'
@@ -13,44 +13,47 @@ interface AuthState {
   logout: () => Promise<void>
 }
 
-const ADMIN_EMAILS = (import.meta.env['VITE_ADMIN_EMAILS'] as string ?? '')
-  .split(',')
-  .map((e) => e.trim())
-  .filter(Boolean)
-
 const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [checking, setChecking] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  async function checkAdmin() {
+    const { data } = await supabase.rpc('check_is_admin')
+    setIsAdmin(data === true)
+  }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null)
+    supabase.auth.getSession().then(async ({ data }) => {
+      const u = data.session?.user ?? null
+      setUser(u)
+      if (u) await checkAdmin()
       setChecking(false)
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null)
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_, session) => {
+      const u = session?.user ?? null
+      setUser(u)
+      if (u) await checkAdmin()
+      else setIsAdmin(false)
     })
 
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  const value = useMemo<AuthState>(() => {
-    const role: AppRole = user
-      ? ADMIN_EMAILS.includes(user.email ?? '') ? 'admin' : 'embaixador'
-      : null
-    const isAdmin = role === 'admin'
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut()
+  }, [])
 
-    async function logout() {
-      await supabase.auth.signOut()
-    }
+  const role: AppRole = user ? (isAdmin ? 'admin' : 'embaixador') : null
 
-    return { user, checking, role, isAdmin, logout }
-  }, [user, checking])
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, checking, role, isAdmin, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth(): AuthState {

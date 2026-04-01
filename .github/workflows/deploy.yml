@@ -38,7 +38,6 @@ jobs:
           VITE_COMISSAO_PCT: ${{ secrets.VITE_COMISSAO_PCT }}
           VITE_DESCONTO_PCT: ${{ secrets.VITE_DESCONTO_PCT }}
           VITE_JANELA_DEVOLUCAO: ${{ secrets.VITE_JANELA_DEVOLUCAO }}
-          VITE_ADMIN_EMAILS: ${{ secrets.VITE_ADMIN_EMAILS }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
