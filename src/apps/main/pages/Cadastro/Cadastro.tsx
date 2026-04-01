@@ -267,11 +267,10 @@ export function PageCadastro() {
       const safe = sanitizeObject(f as unknown as Record<string, unknown>) as unknown as typeof f
       const { error: dbErr } = await supabase.from('embaixadores').insert({
         nome: safe.nome, email: safe.email, cpf: safe.cpf, whatsapp: safe.whatsapp,
-        instagram: safe.instagram, tiktok: safe.tiktok, cupom: cod, status: 'ativo',
-        nivel: 'embaixador', comissao_pct: COMISSAO_PCT,
-        aceite_termos_em: new Date().toISOString(), criado_em: new Date().toISOString(),
+        instagram: safe.instagram || null, tiktok: safe.tiktok || null,
+        cupom: cod, status: 'ativo', nivel: 'embaixadora',
       })
-      if (dbErr) { setErr('Erro ao salvar cadastro. Tente novamente.'); setLoadingFinalizar(false); return }
+      if (dbErr) { setErr('Erro ao salvar cadastro: ' + dbErr.message); setLoadingFinalizar(false); return }
       setCupomFinal(cod)
       setEtapa('sucesso')
     } catch { setErr('Erro inesperado. Tente novamente.') }
