@@ -21,7 +21,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
 
   async function checkAdmin() {
-    const { data } = await supabase.rpc('check_is_admin')
+    const { data, error } = await supabase.rpc('check_is_admin')
+    if (error) throw error
     setIsAdmin(data === true)
   }
 
@@ -29,15 +30,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       const u = data.session?.user ?? null
       setUser(u)
-      if (u) await checkAdmin()
+      if (u) {
+        try {
+          await checkAdmin()
+        } catch {
+          // Token expirado ou corrompido — limpar sessão para destravar o app
+          await supabase.auth.signOut()
+          setUser(null)
+          setIsAdmin(false)
+        }
+      }
+      setChecking(false)
+    }).catch(() => {
+      // Fallback: garantir que o app nunca fica travado no spinner
       setChecking(false)
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_, session) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) await checkAdmin()
-      else setIsAdmin(false)
+      if (u) {
+        try {
+          await checkAdmin()
+        } catch {
+          setIsAdmin(false)
+        }
+      } else {
+        setIsAdmin(false)
+      }
     })
 
     return () => listener.subscription.unsubscribe()
