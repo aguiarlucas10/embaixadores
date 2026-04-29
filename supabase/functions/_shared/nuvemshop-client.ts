@@ -8,12 +8,12 @@
  * traduzir para mensagens úteis.
  */
 
-const STORE_ID = Deno.env.get('NUVEMSHOP_STORE_ID')
+const STORE_ID = Deno.env.get('NUVEMSHOP_USER_ID') ?? Deno.env.get('NUVEMSHOP_STORE_ID')
 const TOKEN = Deno.env.get('NUVEMSHOP_TOKEN')
 const USER_AGENT = Deno.env.get('NUVEMSHOP_USER_AGENT') ?? 'SG Embaixadoras (suporte@saintgermainbrand.com.br)'
 
 if (!STORE_ID || !TOKEN) {
-  console.error('NUVEMSHOP_STORE_ID e NUVEMSHOP_TOKEN são obrigatórios')
+  console.error('NUVEMSHOP_USER_ID e NUVEMSHOP_TOKEN são obrigatórios')
 }
 
 const BASE = `https://api.tiendanube.com/v1/${STORE_ID}`
@@ -102,20 +102,29 @@ async function ns<T>(path: string, init: RequestInit = {}): Promise<NSResult<T>>
   return { ok: true, data }
 }
 
+// O endpoint /orders da Nuvemshop devolve 404 quando o filtro não encontra
+// nenhum pedido (em vez de devolver `[]`). Tratamos esse caso como sucesso
+// com array vazio para o fluxo de validação no cadastro funcionar.
+function emptyOnNotFound<T>(result: NSResult<T[]>): NSResult<T[]> {
+  if (result.ok) return result
+  if (result.error.kind === 'not_found') return { ok: true, data: [] }
+  return result
+}
+
 export const NuvemshopClient = {
   async ordersByEmail(email: string): Promise<NSResult<NSOrder[]>> {
     const q = encodeURIComponent(email)
-    return ns<NSOrder[]>(`/orders?q=${q}&per_page=50`)
+    return emptyOnNotFound(await ns<NSOrder[]>(`/orders?q=${q}&per_page=50`))
   },
 
   async ordersByCoupon(code: string): Promise<NSResult<NSOrder[]>> {
     const q = encodeURIComponent(code)
-    return ns<NSOrder[]>(`/orders?coupon=${q}&per_page=200`)
+    return emptyOnNotFound(await ns<NSOrder[]>(`/orders?coupon=${q}&per_page=200`))
   },
 
   async ordersSince(sinceISO: string): Promise<NSResult<NSOrder[]>> {
     const q = encodeURIComponent(sinceISO)
-    return ns<NSOrder[]>(`/orders?created_at_min=${q}&per_page=200`)
+    return emptyOnNotFound(await ns<NSOrder[]>(`/orders?created_at_min=${q}&per_page=200`))
   },
 
   async getOrder(orderId: number | string): Promise<NSResult<NSOrder>> {
