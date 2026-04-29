@@ -46,20 +46,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (u) {
           try {
             await checkAdmin()
-          } catch {
-            // Token expirado/corrompido ou RPC indisponível — solta a sessão
-            try { await withTimeout(supabase.auth.signOut(), 3000, 'signOut') } catch { /* ignore */ }
-            if (!cancelled) {
-              setUser(null)
-              setIsAdmin(false)
-            }
+          } catch (rpcErr) {
+            // RPC falhou (timeout, rede, função indisponível, etc.) —
+            // mantém a sessão e assume não-admin. NÃO desloga o usuário.
+            console.warn('[Auth] check_is_admin falhou, assumindo não-admin:', rpcErr)
+            if (!cancelled) setIsAdmin(false)
           }
         }
       } catch (e) {
-        // Em qualquer falha (timeout, rede, etc.) limpa o storage local pra
-        // não voltar a hangar no próximo reload e segue como deslogado.
-        console.error('[Auth] bootstrap falhou:', e)
-        try { await withTimeout(supabase.auth.signOut({ scope: 'local' }), 1000, 'signOut local') } catch { /* ignore */ }
+        // Falha em getSession (storage corrompido, etc.) — segue como
+        // deslogado. signOut local apenas, sem invalidar no servidor.
+        console.error('[Auth] getSession falhou:', e)
         if (!cancelled) {
           setUser(null)
           setIsAdmin(false)
