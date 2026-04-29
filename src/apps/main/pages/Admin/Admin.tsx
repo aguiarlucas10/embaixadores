@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@shared/services/supabase'
 import { NS } from '@shared/services/nuvemshopApi'
+import { approveWithdrawal, rejectWithdrawal, markWithdrawalPaid } from '@shared/services/withdrawal'
+import { uploadPaymentProof } from '@shared/services/storage'
 import { brl, fmt, diasPassados, toBRDate, daysAgoBR, keyToLabel, keyToMonthLabel } from '@shared/utils/formatters'
 import type { Embaixador, Resgate } from '@shared/types/database'
 import { Header } from '@shared/components/layout/Header/Header'
@@ -100,8 +102,21 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [msgGrupo, setMsgGrupo] = useState<Msg>({ text: '', ok: false })
   const [syncAdmin, setSyncAdmin] = useState<SyncState>(false)
   const [syncLog, setSyncLog] = useState({ total: 0, novas: 0, erros: 0, atual: '' })
+  const [embPage, setEmbPage] = useState(0)
+  const [embTotal, setEmbTotal] = useState(0)
+  const [embLoading, setEmbLoading] = useState(false)
+  const [exportandoCSV, setExportandoCSV] = useState(false)
+  const EMB_PAGE_SIZE = 50
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pagina embaixadores server-side (substitui o SELECT * antigo que travava com 1.500+ cadastros)
+  useEffect(() => {
+    const t = setTimeout(() => { loadEmbs(0, busca); setEmbPage(0) }, 300)
+    return () => clearTimeout(t)
+  }, [busca]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { loadEmbs(embPage, busca) }, [embPage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (dashModo === 'preset') loadDashboard(dashPeriodo, null, null)
@@ -119,11 +134,25 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     return () => { void supabase.removeChannel(ch) }
   }, [])
 
+  async function loadEmbs(page: number, search: string) {
+    setEmbLoading(true)
+    let q = supabase.from('embaixadores')
+      .select('*, comissoes(valor_comissao,status,resgatada,payment_status)', { count: 'exact' })
+      .order('criado_em', { ascending: false })
+      .range(page * EMB_PAGE_SIZE, page * EMB_PAGE_SIZE + EMB_PAGE_SIZE - 1)
+    if (search.trim()) {
+      const s = `%${search.trim()}%`
+      q = q.or(`nome.ilike.${s},email.ilike.${s},cupom.ilike.${s}`)
+    }
+    const { data, count } = await q
+    setEmbs((data as EmbComissoes[]) ?? [])
+    setEmbTotal(count ?? 0)
+    setEmbLoading(false)
+  }
+
   async function load() {
     setLoading(true)
-    const { data: e } = await supabase.from('embaixadores').select('*, comissoes(valor_comissao,status,resgatada)').order('criado_em', { ascending: false })
-    setEmbs((e as EmbComissoes[]) ?? [])
-    const { data: r } = await supabase.from('resgates').select('*, embaixadores(nome,email,cupom,pix_key)').eq('status', 'pendente').order('criado_em', { ascending: false })
+    const { data: r } = await supabase.from('resgates').select('*, embaixadores(nome,email,cupom,pix_key)').in('status', ['pendente', 'solicitado', 'aprovado']).order('criado_em', { ascending: false })
     setRess((r as ResgateComEmb[]) ?? [])
     const ontem = new Date(Date.now() - 86400000).toISOString()
     const { data: novos } = await supabase.from('embaixadores').select('id,nome,whatsapp,cupom,criado_em').gte('criado_em', ontem)
@@ -199,8 +228,38 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     else if (dashCustomDe && dashCustomAte) loadDashboard(null, dashCustomDe, dashCustomAte)
   }
 
-  async function aprovar(id: string) { await supabase.from('resgates').update({ status: 'aprovado' }).eq('id', id); await load() }
-  async function recusar(id: string) { await supabase.from('resgates').update({ status: 'recusado' }).eq('id', id); await load() }
+  async function aprovar(id: string) {
+    const r = await approveWithdrawal({ resgate_id: id })
+    if (!r.ok) { alert(r.message ?? r.error ?? 'Erro ao aprovar'); return }
+    await load()
+  }
+  async function recusar(id: string) {
+    const motivo = prompt('Motivo da rejeição (opcional):') ?? undefined
+    const r = await rejectWithdrawal({ resgate_id: id, notes: motivo })
+    if (!r.ok) { alert(r.message ?? r.error ?? 'Erro ao rejeitar'); return }
+    await load()
+  }
+  async function pagar(id: string) {
+    const useFile = confirm('Quer anexar comprovante de pagamento? OK = anexar, Cancelar = só marcar como pago.')
+    let proofUrl: string | undefined
+    if (useFile) {
+      const inp = document.createElement('input')
+      inp.type = 'file'
+      inp.accept = 'image/*,application/pdf'
+      const file: File | null = await new Promise((resolve) => {
+        inp.onchange = () => resolve(inp.files?.[0] ?? null)
+        inp.click()
+      })
+      if (file) {
+        const up = await uploadPaymentProof(id, file)
+        if (!up.ok) { alert('Erro no upload do comprovante: ' + up.error); return }
+        proofUrl = up.path
+      }
+    }
+    const r = await markWithdrawalPaid({ resgate_id: id, payment_proof_url: proofUrl })
+    if (!r.ok) { alert(r.message ?? r.error ?? 'Erro ao marcar como pago'); return }
+    await load()
+  }
   async function feito(id: string) {
     await supabase.from('embaixadores').update({ ultima_atividade: new Date().toISOString() }).eq('id', id)
     setFila((f) => f.filter((x) => x.id !== id))
@@ -318,25 +377,32 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
 
   async function salvarBannerCaption() {
     setSalvandoCaption(true)
-    await supabase.from('config').upsert({ chave: 'banner_caption', valor: bannerCaption || '' }, { onConflict: 'chave' })
-    setSalvandoCaption(false); setMsgBanner({ text: 'Mensagem salva com sucesso!', ok: true })
+    const { error } = await supabase.from('config').upsert({ chave: 'banner_caption', valor: bannerCaption || '' }, { onConflict: 'chave' })
+    setSalvandoCaption(false)
+    if (error) { setMsgBanner({ text: 'Erro ao salvar legenda: ' + error.message, ok: false }); return }
+    setMsgBanner({ text: 'Mensagem salva com sucesso!', ok: true })
   }
 
   async function salvarAltura() {
     setSalvandoAltura(true)
-    await supabase.from('config').upsert({ chave: 'banner_altura', valor: String(bannerAltura) }, { onConflict: 'chave' })
-    setSalvandoAltura(false); setMsgBanner({ text: 'Altura salva!', ok: true })
+    const { error } = await supabase.from('config').upsert({ chave: 'banner_altura', valor: String(bannerAltura) }, { onConflict: 'chave' })
+    setSalvandoAltura(false)
+    if (error) { setMsgBanner({ text: 'Erro ao salvar altura: ' + error.message, ok: false }); return }
+    setMsgBanner({ text: 'Altura salva!', ok: true })
   }
 
   async function removerBanner() {
-    await supabase.from('config').upsert({ chave: 'banner_ativo', valor: '' }, { onConflict: 'chave' })
+    const { error } = await supabase.from('config').upsert({ chave: 'banner_ativo', valor: '' }, { onConflict: 'chave' })
+    if (error) { setMsgBanner({ text: 'Erro ao remover banner: ' + error.message, ok: false }); return }
     setBanner(''); setBannerPreview(null); setMsgBanner({ text: 'Banner removido.', ok: true })
   }
 
   async function salvarGrupoLink() {
     setSalvandoGrupo(true); setMsgGrupo({ text: '', ok: false })
-    await supabase.from('config').upsert({ chave: 'grupo_vip_link', valor: grupoLinkAdmin }, { onConflict: 'chave' })
-    setMsgGrupo({ text: 'Link salvo com sucesso!', ok: true }); setSalvandoGrupo(false)
+    const { error } = await supabase.from('config').upsert({ chave: 'grupo_vip_link', valor: grupoLinkAdmin }, { onConflict: 'chave' })
+    setSalvandoGrupo(false)
+    if (error) { setMsgGrupo({ text: 'Erro ao salvar link: ' + error.message, ok: false }); return }
+    setMsgGrupo({ text: 'Link salvo com sucesso!', ok: true })
   }
 
   async function salvarEdicao() {
@@ -348,16 +414,34 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       status: editForm.status, nivel: editForm.nivel, pix_key: editForm.pix_key,
     }).eq('id', editEmb.id)
     if (error) { setMsgEdit({ text: 'Erro ao salvar: ' + error.message, ok: false }) }
-    else { setMsgEdit({ text: 'Salvo com sucesso!', ok: true }); await load(); setEditEmb(null) }
+    else { setMsgEdit({ text: 'Salvo com sucesso!', ok: true }); await loadEmbs(embPage, busca); setEditEmb(null) }
     setSavingEdit(false)
   }
 
-  function exportarCSV() {
-    const cols = ['Nome', 'Email', 'WhatsApp', 'Instagram', 'TikTok', 'Cupom', 'Status', 'Nivel', 'Pix', 'Cadastro']
-    const lines = [cols.join(','), ...embs.map((e) => [e.nome, e.email, e.whatsapp, e.instagram ?? '', e.tiktok ?? '', e.cupom, e.status, e.nivel ?? 'embaixadora', e.pix_key ?? '', fmt(e.criado_em)].map((v) => String(v ?? '').replace(/"/g, '')).join(','))]
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'embaixadores.csv'; a.click(); URL.revokeObjectURL(url)
+  async function exportarCSV() {
+    setExportandoCSV(true)
+    try {
+      const all: Embaixador[] = []
+      const SIZE = 500
+      let page = 0
+      while (true) {
+        const { data } = await supabase.from('embaixadores')
+          .select('nome,email,whatsapp,instagram,tiktok,cupom,status,nivel,pix_key,criado_em')
+          .order('criado_em', { ascending: false })
+          .range(page * SIZE, page * SIZE + SIZE - 1)
+        if (!data || data.length === 0) break
+        all.push(...(data as Embaixador[]))
+        if (data.length < SIZE) break
+        page++
+      }
+      const cols = ['Nome', 'Email', 'WhatsApp', 'Instagram', 'TikTok', 'Cupom', 'Status', 'Nivel', 'Pix', 'Cadastro']
+      const lines = [cols.join(','), ...all.map((e) => [e.nome, e.email, e.whatsapp, e.instagram ?? '', e.tiktok ?? '', e.cupom, e.status, e.nivel ?? 'embaixadora', e.pix_key ?? '', fmt(e.criado_em)].map((v) => String(v ?? '').replace(/"/g, '')).join(','))]
+      const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = 'embaixadores.csv'; a.click(); URL.revokeObjectURL(url)
+    } finally {
+      setExportandoCSV(false)
+    }
   }
 
   function exportarFinanceiroCSV() {
@@ -371,9 +455,9 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     const a = document.createElement('a'); a.href = url; a.download = 'resgates_financeiro.csv'; a.click(); URL.revokeObjectURL(url)
   }
 
+  // Busca é server-side (em loadEmbs); aqui só ordena a página atual
   const filtrados = useMemo(() => {
-    const base = embs.filter((e) => !busca || [e.nome, e.email, e.cupom].join(' ').toLowerCase().includes(busca.toLowerCase()))
-    return [...base].sort((a, b) => {
+    return [...embs].sort((a, b) => {
       if (ordemEmb === 'nome') return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt')
       if (ordemEmb === 'faturamento') {
         const fa = (a.comissoes ?? []).reduce((s, c) => s + (c.valor_comissao ?? 0), 0)
@@ -387,11 +471,11 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       }
       return new Date(b.criado_em ?? 0).getTime() - new Date(a.criado_em ?? 0).getTime()
     })
-  }, [embs, busca, ordemEmb])
+  }, [embs, ordemEmb])
 
   if (loading) return <div className={styles.page}><Header user={user} onLogout={onLogout} isAdmin /><Spinner /></div>
 
-  const tabLabels = { dashboard: 'Dashboard', embaixadores: `Embaixadores (${embs.length})`, resgates: ress.length > 0 ? `Resgates (${ress.length})` : 'Resgates', fila: `Fila (${fila.length})`, financeiro: 'Financeiro', banner: 'Banner', whatsapp: unread > 0 ? `WhatsApp (${unread})` : 'WhatsApp', chat: unread > 0 ? `Chat (${unread})` : 'Chat', importar: 'Importar', 'pré-estreia': 'Pré-estreia' }
+  const tabLabels = { dashboard: 'Dashboard', embaixadores: `Embaixadores (${embTotal})`, resgates: ress.length > 0 ? `Resgates (${ress.length})` : 'Resgates', fila: `Fila (${fila.length})`, financeiro: 'Financeiro', banner: 'Banner', whatsapp: unread > 0 ? `WhatsApp (${unread})` : 'WhatsApp', chat: unread > 0 ? `Chat (${unread})` : 'Chat', importar: 'Importar', 'pré-estreia': 'Pré-estreia' }
 
   return (
     <div className={styles.page}>
@@ -589,7 +673,26 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                     <button key={v} className={`${styles.sortBtn} ${ordemEmb === v ? styles.sortBtnActive : ''}`} onClick={() => setOrdemEmb(v)}>{l}</button>
                   ))}
                 </div>
-                <BtnSecondary onClick={exportarCSV} style={{ width: 'auto', padding: '8px 16px', fontSize: 10 }}>Exportar CSV</BtnSecondary>
+                <BtnSecondary onClick={exportarCSV} style={{ width: 'auto', padding: '8px 16px', fontSize: 10 }} disabled={exportandoCSV}>
+                  {exportandoCSV ? 'Exportando...' : 'Exportar CSV'}
+                </BtnSecondary>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', fontSize: 12, color: '#707070' }}>
+                <span>
+                  {embLoading ? 'Carregando...' : embTotal === 0 ? 'Nenhum resultado' :
+                    `${embPage * EMB_PAGE_SIZE + 1}–${Math.min((embPage + 1) * EMB_PAGE_SIZE, embTotal)} de ${embTotal}`}
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setEmbPage((p) => Math.max(0, p - 1))} disabled={embPage === 0 || embLoading}
+                    style={{ padding: '6px 12px', fontSize: 11, background: '#fff', border: '1px solid #d0d0d0', cursor: embPage === 0 || embLoading ? 'not-allowed' : 'pointer', opacity: embPage === 0 || embLoading ? 0.5 : 1 }}>
+                    ← Anterior
+                  </button>
+                  <button onClick={() => setEmbPage((p) => p + 1)} disabled={(embPage + 1) * EMB_PAGE_SIZE >= embTotal || embLoading}
+                    style={{ padding: '6px 12px', fontSize: 11, background: '#fff', border: '1px solid #d0d0d0', cursor: (embPage + 1) * EMB_PAGE_SIZE >= embTotal || embLoading ? 'not-allowed' : 'pointer', opacity: (embPage + 1) * EMB_PAGE_SIZE >= embTotal || embLoading ? 0.5 : 1 }}>
+                    Próxima →
+                  </button>
+                </div>
               </div>
 
               {filtrados.map((e) => {
@@ -656,23 +759,36 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
           {/* ─── RESGATES ─── */}
           {tab === 'resgates' && (
             <div className="fade-in">
-              <p className={styles.sectionTitle}>Resgates pendentes</p>
+              <p className={styles.sectionTitle}>
+                Resgates · {ress.filter((r) => r.status === 'solicitado' || r.status === 'pendente').length} aguardando aprovação · {ress.filter((r) => r.status === 'aprovado').length} aprovados a pagar
+              </p>
               {ress.length === 0
-                ? <p className={styles.empty}>Nenhuma solicitação pendente.</p>
-                : ress.map((r) => (
+                ? <p className={styles.empty}>Nenhuma solicitação aberta.</p>
+                : ress.map((r) => {
+                  const aguardandoAprov = r.status === 'solicitado' || r.status === 'pendente'
+                  const aprovado = r.status === 'aprovado'
+                  return (
                   <div key={r.id} className={styles.resgateRow}>
                     <div>
                       <p className={styles.rowTitle}>{r.embaixadores?.nome ?? '—'}</p>
-                      <p className={styles.rowSub}>{r.embaixadores?.email} · {r.tipo === 'pix' ? 'Pix: ' + (r.pix_key ?? r.embaixadores?.pix_key) : 'Crédito'}</p>
-                      <p className={styles.rowSub}>{fmt(r.criado_em)}</p>
+                      <p className={styles.rowSub}>{r.embaixadores?.email} · Pix: {r.pix_key ?? r.embaixadores?.pix_key}{r.pix_key_type ? ` (${r.pix_key_type})` : ''}</p>
+                      <p className={styles.rowSub}>Solicitado {fmt(r.criado_em)}{aprovado && r.approved_at ? ` · Aprovado ${fmt(r.approved_at)}` : ''}</p>
                     </div>
                     <div className={styles.resgateActions}>
                       <p className={styles.resgateVal}>{brl(r.valor)}</p>
-                      <BtnPrimary onClick={() => aprovar(r.id)} style={{ width: 'auto', padding: '8px 16px', fontSize: 10 }}>Aprovar</BtnPrimary>
-                      <BtnGhost onClick={() => recusar(r.id)}>Recusar</BtnGhost>
+                      <Badge text={r.status} color={aprovado ? '#000' : '#a0a0a0'} />
+                      {aguardandoAprov && (<>
+                        <BtnPrimary onClick={() => aprovar(r.id)} style={{ width: 'auto', padding: '8px 16px', fontSize: 10 }}>Aprovar</BtnPrimary>
+                        <BtnGhost onClick={() => recusar(r.id)}>Rejeitar</BtnGhost>
+                      </>)}
+                      {aprovado && (<>
+                        <BtnPrimary onClick={() => pagar(r.id)} style={{ width: 'auto', padding: '8px 16px', fontSize: 10 }}>Marcar pago</BtnPrimary>
+                        <BtnGhost onClick={() => recusar(r.id)}>Rejeitar</BtnGhost>
+                      </>)}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
             </div>
           )}
 

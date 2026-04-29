@@ -5,10 +5,11 @@
 
 export type NivelEmbaixador = 'embaixadora' | 'influenciadora' | 'destaque'
 export type StatusEmbaixador = 'ativo' | 'inativo' | 'pendente'
-export type StatusComissao = 'pendente' | 'confirmada' | 'resgatada'
-export type StatusResgate = 'pendente' | 'aprovado' | 'recusado' | 'pago'
+export type StatusComissao = 'pendente' | 'confirmada' | 'resgatada' | 'paga' | 'cancelada'
+export type StatusResgate = 'pendente' | 'solicitado' | 'aprovado' | 'recusado' | 'rejeitado' | 'pago'
 export type TipoResgate = 'pix'
 export type StatusPagamento = 'pending' | 'paid' | 'refunded' | 'cancelled' | 'voided' | 'abandoned' | 'authorized'
+export type PixKeyType = 'cpf' | 'email' | 'phone' | 'random'
 
 // ─── Embaixador (programa principal) ─────────────────────────────────────────
 
@@ -59,6 +60,12 @@ export interface Comissao {
   resgatada: boolean
   criado_em: string
   confirmado_em?: string
+  data_pedido?: string
+  return_window_ends_at?: string
+  confirmed_at?: string
+  cancelled_at?: string
+  cancelled_reason?: string
+  resgate_id?: string | null
   embaixadores?: Pick<Embaixador, 'nome' | 'email' | 'cupom'>
 }
 
@@ -86,9 +93,17 @@ export interface Resgate {
   valor: number
   tipo: TipoResgate
   pix_key: string
+  pix_key_type?: PixKeyType
   status: StatusResgate
   criado_em: string
   processado_em?: string
+  approved_at?: string
+  paid_at?: string
+  rejected_at?: string
+  approved_by?: string
+  paid_by?: string
+  payment_proof_url?: string
+  admin_notes?: string
   embaixadores?: Pick<Embaixador, 'nome' | 'email'>
 }
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@shared/services/supabase'
-import { NS } from '@shared/services/nuvemshopApi'
+import { ordersByEmail, checkCoupon, createCoupon } from '@shared/services/nuvemshop'
 import { gerarCupomBase } from '@shared/utils/coupon'
 import { validarNome, validarEmail, validarCPF, validarWhatsApp, sanitizeObject } from '@shared/utils/validators'
 import styles from './Cadastro.module.css'
@@ -224,28 +224,42 @@ export function PageCadastro() {
       const { data: ex } = await supabase.from('embaixadores').select('id').eq('email', f.email).maybeSingle()
       if (ex) { setErr('Este e-mail já está cadastrado. Acesse seu painel pelo login.'); setLoading(false); return }
 
-      const opcoesTentativas = gerarOpcoes(f.nome)
-      for (const cod of opcoesTentativas) {
-        const chkJson = await NS.checkCoupon(cod)
-        if (chkJson.exists) {
-          setErr('Já existe um cupom cadastrado para esse perfil. Entre em contato com a Saint Germain.')
-          setLoading(false); return
+      const ordersResult = await ordersByEmail(f.email)
+      if (!ordersResult.ok) {
+        if (ordersResult.errorKind === 'auth') {
+          setErr('Erro de configuração no sistema (autenticação Nuvemshop). Avise a equipe.')
+        } else {
+          setErr('Não conseguimos consultar a base de pedidos agora. Tente novamente em alguns minutos.')
         }
+        setLoading(false); return
       }
-
-      const pedidos = await NS.ordersByEmail(f.email)
-      const statusValidos = ['paid', 'authorized', 'pending']
-      const pedidosPagos = (pedidos ?? []).filter((p) => statusValidos.includes(p.payment_status))
-      if (!pedidosPagos.length) {
+      if (!ordersResult.found) {
         setErr('Que pena! Não encontramos pedidos válidos com esse e-mail. Esse programa é exclusivo para clientes da Saint Germain.')
         setLoading(false); return
       }
 
       const opcoes = gerarOpcoes(f.nome)
-      setOpcoesCupom(opcoes)
-      setCupomEscolhido(opcoes[0] ?? '')
+      const checks = await Promise.all(opcoes.map((cod) => checkCoupon(cod)))
+      const authError = checks.find((c) => c.state === 'error_auth')
+      if (authError) {
+        setErr('Erro de configuração no sistema (autenticação Nuvemshop). Avise a equipe.')
+        setLoading(false); return
+      }
+      const otherError = checks.find((c) => !c.ok && c.state === 'error_other')
+      if (otherError) {
+        setErr('Não conseguimos verificar disponibilidade dos cupons agora. Tente novamente em alguns minutos.')
+        setLoading(false); return
+      }
+      const disponiveis = opcoes.filter((_, i) => checks[i]!.state === 'available')
+      if (!disponiveis.length) {
+        setErr('Todas as variações do seu cupom já estão em uso. Entre em contato com a Saint Germain.')
+        setLoading(false); return
+      }
+
+      setOpcoesCupom(disponiveis)
+      setCupomEscolhido(disponiveis[0] ?? '')
       setEtapa('cupom')
-    } catch { setErr('Erro inesperado. Tente novamente.') }
+    } catch (e) { setErr('Erro inesperado: ' + String(e)) }
     setLoading(false)
   }
 
@@ -253,16 +267,22 @@ export function PageCadastro() {
     setErr(''); setLoadingFinalizar(true)
     try {
       let cod = cupomEscolhido
-      let criado = await NS.createCoupon(cod)
-      if (!criado.ok && criado.duplicate) {
+      const pct = DESCONTO_PCT * 100
+      let criado = await createCoupon(cod, pct)
+      if (!criado.ok && criado.state === 'taken') {
         for (let i = 2; i <= 9; i++) {
           cod = cupomEscolhido.slice(0, 10) + i
-          criado = await NS.createCoupon(cod)
+          criado = await createCoupon(cod, pct)
           if (criado.ok) break
-          if (!criado.duplicate) break
+          if (criado.state !== 'taken') break
         }
       }
-      if (!criado.ok) { setErr('Este cupom já está em uso. Escolha outra opção.'); setLoadingFinalizar(false); return }
+      if (!criado.ok) {
+        if (criado.state === 'error_auth') setErr('Erro de configuração (autenticação Nuvemshop). Avise a equipe.')
+        else if (criado.state === 'taken') setErr('Este cupom já está em uso. Escolha outra opção.')
+        else setErr('Erro ao criar cupom: ' + (criado.message ?? 'tente novamente'))
+        setLoadingFinalizar(false); return
+      }
 
       const safe = sanitizeObject(f as unknown as Record<string, unknown>) as unknown as typeof f
       const { error: dbErr } = await supabase.from('embaixadores').insert({
@@ -273,7 +293,7 @@ export function PageCadastro() {
       if (dbErr) { setErr('Erro ao salvar cadastro: ' + dbErr.message); setLoadingFinalizar(false); return }
       setCupomFinal(cod)
       setEtapa('sucesso')
-    } catch { setErr('Erro inesperado. Tente novamente.') }
+    } catch (e) { setErr('Erro inesperado: ' + String(e)) }
     setLoadingFinalizar(false)
   }
 

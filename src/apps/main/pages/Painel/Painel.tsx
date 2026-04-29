@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@shared/services/supabase'
-import { NS } from '@shared/services/nuvemshopApi'
-import { brl, fmt, diasPassados } from '@shared/utils/formatters'
+import { requestWithdrawal, type PixKeyType } from '@shared/services/withdrawal'
+import { brl, fmt } from '@shared/utils/formatters'
+import { isWithdrawalWindow } from '@shared/utils/dates'
+import { pendente as somaPendente, confirmado as somaConfirmado, pago as somaPago } from '@shared/utils/balance'
 import type { Embaixador, Comissao, Resgate } from '@shared/types/database'
 import { Header } from '@shared/components/layout/Header/Header'
 import { Tabs } from '@shared/components/layout/Tabs/Tabs'
@@ -15,9 +17,6 @@ import { BtnPrimary, BtnGhost } from '@shared/components/atoms/Button/Button'
 import { Input } from '@shared/components/atoms/Input/Input'
 import { validarNome, validarWhatsApp, validarPixKey, sanitizeObject } from '@shared/utils/validators'
 import styles from './Painel.module.css'
-
-const COMISSAO_PCT = Number(import.meta.env['VITE_COMISSAO_PCT'] ?? 0.1)
-const JANELA_DEVOLUCAO = Number(import.meta.env['VITE_JANELA_DEVOLUCAO'] ?? 7)
 
 interface PainelPageProps {
   user: User
@@ -44,18 +43,20 @@ interface Msg {
 }
 
 function statusLabel(c: Comissao): [string, string] {
-  if (c.payment_status === 'voided' || c.payment_status === 'refunded') return ['#c00', 'Cancelado']
+  if (c.status === 'cancelada' || c.payment_status === 'voided' || c.payment_status === 'refunded') return ['#c00', 'Cancelada']
   if (c.payment_status === 'abandoned') return ['#a0a0a0', 'Abandonado']
+  if (c.status === 'paga' || c.resgatada) return ['#000', 'Paga']
   if (c.status === 'confirmada') return ['#000', 'Confirmada']
-  if (c.status === 'resgatada') return ['#000', 'Paga']
   return ['#a0a0a0', 'Pendente']
 }
 
 const bResgate: Record<string, [string, string]> = {
   solicitado: ['#a0a0a0', 'Solicitado'],
+  pendente: ['#a0a0a0', 'Solicitado'],
   aprovado: ['#000', 'Aprovado'],
   pago: ['#000', 'Pago'],
   recusado: ['#c00', 'Recusado'],
+  rejeitado: ['#c00', 'Rejeitado'],
 }
 
 export function PainelPage({ user, onLogout }: PainelPageProps) {
@@ -68,8 +69,7 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
   const [grupoLink, setGrupoLink] = useState('')
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('inicio')
-  const [sync, setSync] = useState(false)
-  const [fResgate, setFResgate] = useState({ tipo: 'pix', pix: '' })
+  const [fResgate, setFResgate] = useState<{ pix_key_type: PixKeyType; pix_key: string }>({ pix_key_type: 'cpf', pix_key: '' })
   const [msgR, setMsgR] = useState<Msg>({ text: '', ok: false })
   const [resgatando, setResgatando] = useState(false)
   const [perfil, setPerfil] = useState<PerfilForm>({
@@ -110,50 +110,31 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
     setLoading(false)
   }
 
-  async function sincronizar() {
-    if (!emb) return
-    setSync(true)
-    const pedidos = await NS.ordersByCoupon(emb.cupom)
-    for (const p of pedidos ?? []) {
-      const cupons = (p as unknown as { coupon?: { code: string }[] }).coupon ?? []
-      const usouCupom = cupons.some((c) => String(c.code ?? '').toUpperCase() === String(emb.cupom).toUpperCase())
-      if (!usouCupom) continue
-      if (p.payment_status === 'voided' || p.payment_status === 'refunded') continue
-      const { data: ex } = await supabase.from('comissoes').select('id').eq('pedido_id', String(p.id)).maybeSingle()
-      if (ex) continue
-      const val = parseFloat(p.total)
-      const status = p.payment_status === 'paid' ? (diasPassados(p.created_at, JANELA_DEVOLUCAO) ? 'confirmada' : 'pendente') : 'pendente'
-      await supabase.from('comissoes').insert({
-        embaixador_id: emb.id, pedido_id: String(p.id),
-        valor_pedido: val, valor_comissao: val * COMISSAO_PCT,
-        status, payment_status: p.payment_status, criado_em: p.created_at,
-      })
-    }
-    await load()
-    setSync(false)
-  }
-
   async function resgatar() {
-    const saldo = cs.filter((c) => c.status === 'confirmada' && !c.resgatada).reduce((s, c) => s + c.valor_comissao, 0)
-    if (saldo <= 0) { setMsgR({ text: 'Nenhum saldo disponível para resgate.', ok: false }); return }
+    const saldo = somaConfirmado(cs)
     if (saldo < 100) { setMsgR({ text: 'O valor mínimo para solicitar resgate é R$ 100,00. Continue acumulando!', ok: false }); return }
-    const hoje = new Date()
-    if (hoje.getDate() > 10) {
-      const proxMes = hoje.getMonth() === 11 ? '01' : String(hoje.getMonth() + 2).padStart(2, '0')
-      setMsgR({ text: `O prazo de solicitação (até dia 10) encerrou. Seu saldo acumulará para o próximo ciclo (dia 10/${proxMes}).`, ok: false })
+    if (!isWithdrawalWindow()) {
+      setMsgR({ text: 'O prazo de solicitação (até dia 10) encerrou. Seu saldo acumulará para o próximo ciclo.', ok: false })
       return
     }
-    if (!emb?.pix_key) { setMsgR({ text: 'Cadastre sua chave Pix na aba Perfil antes de solicitar o resgate.', ok: false }); return }
+    const pix = fResgate.pix_key.trim() || emb?.pix_key || ''
+    if (!pix) { setMsgR({ text: 'Cadastre sua chave Pix na aba Perfil antes de solicitar o resgate.', ok: false }); return }
+
     setResgatando(true)
-    const pixUsada = fResgate.tipo === 'pix' ? (fResgate.pix || emb.pix_key) : ''
-    await supabase.from('resgates').insert({
-      embaixador_id: emb.id, valor: saldo, tipo: 'pix',
-      pix_key: pixUsada, status: 'pendente', criado_em: new Date().toISOString(),
+    const result = await requestWithdrawal({
+      valor: saldo,
+      pix_key: pix,
+      pix_key_type: fResgate.pix_key_type,
     })
-    await supabase.from('comissoes').update({ resgatada: true }).eq('embaixador_id', emb.id).eq('status', 'confirmada').is('resgatada', null)
+    setResgatando(false)
+
+    if (!result.ok) {
+      const msg = result.message ?? result.error ?? 'Erro ao solicitar resgate'
+      setMsgR({ text: msg, ok: false })
+      return
+    }
     setMsgR({ text: `Resgate de ${brl(saldo)} solicitado com sucesso! Pagamento até dia 20 deste mês.`, ok: true })
     await load()
-    setResgatando(false)
   }
 
   async function salvarPerfil() {
@@ -204,8 +185,9 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
     </div>
   )
 
-  const saldoDisp = cs.filter((c) => c.status === 'confirmada' && !c.resgatada).reduce((s, c) => s + c.valor_comissao, 0)
-  const saldoPend = cs.filter((c) => c.status === 'pendente' && c.payment_status === 'paid').reduce((s, c) => s + c.valor_comissao, 0)
+  const saldoDisp = somaConfirmado(cs)
+  const saldoPend = somaPendente(cs)
+  const saldoPago = somaPago(cs)
 
   return (
     <div className={styles.page}>
@@ -249,10 +231,10 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
         {/* Stats */}
         <StatGrid
           items={[
-            [brl(saldoDisp), 'Disponível para resgate'],
             [brl(saldoPend), 'Pendente'],
+            [brl(saldoDisp), 'Confirmado'],
+            [brl(saldoPago), 'Pago acumulado'],
             [brl(cs.reduce((s, c) => s + c.valor_pedido, 0)), 'Total em vendas'],
-            [brl(cs.filter((c) => c.payment_status === 'paid' || c.status === 'confirmada').reduce((s, c) => s + c.valor_comissao, 0)), 'Comissão acumulada'],
           ]}
           cols={4}
         />
@@ -269,19 +251,18 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
             <div className="fade-in">
               <div className={styles.tabHeader}>
                 <p className={styles.tabLabel}>Últimas vendas</p>
-                <BtnGhost onClick={sincronizar}>
-                  {sync ? <span className={styles.syncSpinner} /> : 'Sincronizar'}
-                </BtnGhost>
               </div>
               {cs.length === 0
                 ? <p className={styles.empty}>Nenhuma venda registrada. Compartilhe seu cupom para começar.</p>
-                : cs.slice(0, 5).map((c) => (
+                : cs.slice(0, 5).map((c) => {
+                  const confirmaEm = c.status === 'pendente' && c.return_window_ends_at ? `Confirma em ${fmt(c.return_window_ends_at)}` : c.status === 'confirmada' && c.confirmed_at ? `Confirmada em ${fmt(c.confirmed_at)}` : ''
+                  return (
                   <Row
                     key={c.id}
                     left={
                       <div>
                         <p className={styles.rowTitle}>Pedido #{c.pedido_id}</p>
-                        <p className={styles.rowSub}>{fmt(c.criado_em)}</p>
+                        <p className={styles.rowSub}>{fmt(c.criado_em)}{confirmaEm ? ` · ${confirmaEm}` : ''}</p>
                       </div>
                     }
                     right={
@@ -291,7 +272,8 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
                       </div>
                     }
                   />
-                ))}
+                  )
+                })}
               {cs.length > 5 && (
                 <BtnGhost onClick={() => setTab('vendas')} style={{ marginTop: 16 }}>
                   Ver todas ({cs.length}) →
@@ -305,9 +287,6 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
             <div className="fade-in">
               <div className={styles.tabHeader}>
                 <p className={styles.tabLabel}>Histórico completo</p>
-                <BtnGhost onClick={sincronizar}>
-                  {sync ? <span className={styles.syncSpinner} /> : 'Sincronizar'}
-                </BtnGhost>
               </div>
               {cs.length === 0
                 ? <p className={styles.empty}>Nenhuma venda registrada ainda.</p>
@@ -363,33 +342,31 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
                 </div>
               )}
 
-              {emb.pix_key && saldoDisp >= 100 && new Date().getDate() > 10 && (
+              {emb.pix_key && saldoDisp >= 100 && !isWithdrawalWindow() && (
                 <div className={styles.alertWrap}>
                   <Alert msg={`O prazo de solicitação (até dia 10) encerrou para este mês. Seu saldo de ${brl(saldoDisp)} será acumulado para o próximo ciclo.`} />
                 </div>
               )}
 
-              {emb.pix_key && saldoDisp >= 100 && new Date().getDate() <= 10 && (
+              {emb.pix_key && saldoDisp >= 100 && isWithdrawalWindow() && (
                 <div className={styles.resgateForm}>
-                  <p className={styles.resgateFormLabel}>Forma de resgate</p>
+                  <p className={styles.resgateFormLabel}>Tipo da chave PIX</p>
                   <div className={styles.tipoBtns}>
-                    {([['credito', 'Crédito na loja'], ['pix', 'Pix']] as [string, string][]).map(([val, lbl], i) => (
+                    {([['cpf', 'CPF'], ['email', 'E-mail'], ['phone', 'Telefone'], ['random', 'Aleatória']] as [PixKeyType, string][]).map(([val, lbl], i, arr) => (
                       <button
                         key={val}
-                        className={`${styles.tipoBtn} ${fResgate.tipo === val ? styles.tipoBtnActive : ''}`}
-                        style={{ borderRight: i === 0 ? '1px solid #000' : 'none' }}
-                        onClick={() => setFResgate((p) => ({ ...p, tipo: val }))}
+                        className={`${styles.tipoBtn} ${fResgate.pix_key_type === val ? styles.tipoBtnActive : ''}`}
+                        style={{ borderRight: i < arr.length - 1 ? '1px solid #000' : 'none' }}
+                        onClick={() => setFResgate((p) => ({ ...p, pix_key_type: val }))}
                       >
                         {lbl}
                       </button>
                     ))}
                   </div>
-                  {fResgate.tipo === 'pix' && (
-                    <div className={styles.pixInfo}>
-                      <p>Chave Pix cadastrada: <strong>{emb.pix_key}</strong></p>
-                      <button className={styles.alterarPix} onClick={() => setTab('perfil')}>Alterar no Perfil</button>
-                    </div>
-                  )}
+                  <div className={styles.pixInfo}>
+                    <p>Chave PIX cadastrada: <strong>{emb.pix_key}</strong></p>
+                    <button className={styles.alterarPix} onClick={() => setTab('perfil')}>Alterar no Perfil</button>
+                  </div>
                   <div className={styles.valorResgate}>
                     <p>Valor a resgatar: <strong className={styles.valorDestaque}>{brl(saldoDisp)}</strong></p>
                   </div>

@@ -232,29 +232,33 @@ export function PageAdminSG({ user, onLogout }: AdminSGProps) {
     const { uploadBanner } = await import('@shared/services/storageProxy')
     const result = await uploadBanner(file, 'banners', path)
     if ('error' in result) { setMsgBanner({ text: result.error, ok: false }); setUploadando(false); return }
-    await supabase.from('config').upsert({ chave: 'banner_sg_ativo', valor: result.url }, { onConflict: 'chave' })
+    const { error } = await supabase.from('config').upsert({ chave: 'banner_sg_ativo', valor: result.url }, { onConflict: 'chave' })
+    if (error) { setMsgBanner({ text: 'Erro ao salvar banner: ' + error.message, ok: false }); setUploadando(false); return }
     setBanner(result.url); setBannerPreview(null)
     setMsgBanner({ text: 'Banner atualizado!', ok: true })
     setUploadando(false)
   }
 
   async function removerBanner() {
-    await supabase.from('config').upsert({ chave: 'banner_sg_ativo', valor: null }, { onConflict: 'chave' })
+    const { error } = await supabase.from('config').upsert({ chave: 'banner_sg_ativo', valor: '' }, { onConflict: 'chave' })
+    if (error) { setMsgBanner({ text: 'Erro ao remover banner: ' + error.message, ok: false }); return }
     setBanner(''); setBannerPreview(null)
     setMsgBanner({ text: 'Banner removido.', ok: true })
   }
 
   async function salvarBannerCaption() {
     setSalvandoCaption(true)
-    await supabase.from('config').upsert({ chave: 'banner_sg_caption', valor: bannerCaption || null }, { onConflict: 'chave' })
+    const { error } = await supabase.from('config').upsert({ chave: 'banner_sg_caption', valor: bannerCaption || '' }, { onConflict: 'chave' })
     setSalvandoCaption(false)
+    if (error) { setMsgBanner({ text: 'Erro ao salvar mensagem: ' + error.message, ok: false }); return }
     setMsgBanner({ text: 'Mensagem salva!', ok: true })
   }
 
   async function salvarAltura() {
     setSalvandoAltura(true)
-    await supabase.from('config').upsert({ chave: 'banner_sg_altura', valor: String(bannerAltura) }, { onConflict: 'chave' })
+    const { error } = await supabase.from('config').upsert({ chave: 'banner_sg_altura', valor: String(bannerAltura) }, { onConflict: 'chave' })
     setSalvandoAltura(false)
+    if (error) { setMsgBanner({ text: 'Erro ao salvar altura: ' + error.message, ok: false }); return }
     setMsgBanner({ text: 'Altura salva!', ok: true })
   }
 
