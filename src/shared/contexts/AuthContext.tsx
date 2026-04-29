@@ -15,36 +15,60 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null)
 
+// Garante que nenhuma chamada de auth pode pendurar a UI indefinidamente.
+// Se passar do prazo a Promise rejeita e o catch destrava o `checking`.
+function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timeout (${ms}ms)`)), ms)
+    p.then((v) => { clearTimeout(t); resolve(v) }, (e) => { clearTimeout(t); reject(e) })
+  })
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [checking, setChecking] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
 
   async function checkAdmin() {
-    const { data, error } = await supabase.rpc('check_is_admin')
+    const { data, error } = await withTimeout(supabase.rpc('check_is_admin'), 5000, 'check_is_admin')
     if (error) throw error
     setIsAdmin(data === true)
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      const u = data.session?.user ?? null
-      setUser(u)
-      if (u) {
-        try {
-          await checkAdmin()
-        } catch {
-          // Token expirado ou corrompido — limpar sessão para destravar o app
-          await supabase.auth.signOut()
+    let cancelled = false
+    async function bootstrap() {
+      try {
+        const { data } = await withTimeout(supabase.auth.getSession(), 5000, 'getSession')
+        if (cancelled) return
+        const u = data.session?.user ?? null
+        setUser(u)
+        if (u) {
+          try {
+            await checkAdmin()
+          } catch {
+            // Token expirado/corrompido ou RPC indisponível — solta a sessão
+            try { await withTimeout(supabase.auth.signOut(), 3000, 'signOut') } catch { /* ignore */ }
+            if (!cancelled) {
+              setUser(null)
+              setIsAdmin(false)
+            }
+          }
+        }
+      } catch (e) {
+        // Em qualquer falha (timeout, rede, etc.) limpa o storage local pra
+        // não voltar a hangar no próximo reload e segue como deslogado.
+        console.error('[Auth] bootstrap falhou:', e)
+        try { await withTimeout(supabase.auth.signOut({ scope: 'local' }), 1000, 'signOut local') } catch { /* ignore */ }
+        if (!cancelled) {
           setUser(null)
           setIsAdmin(false)
         }
+      } finally {
+        if (!cancelled) setChecking(false)
       }
-      setChecking(false)
-    }).catch(() => {
-      // Fallback: garantir que o app nunca fica travado no spinner
-      setChecking(false)
-    })
+    }
+    void bootstrap()
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_, session) => {
       const u = session?.user ?? null
@@ -60,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    return () => listener.subscription.unsubscribe()
+    return () => { cancelled = true; listener.subscription.unsubscribe() }
   }, [])
 
   const logout = useCallback(async () => {
