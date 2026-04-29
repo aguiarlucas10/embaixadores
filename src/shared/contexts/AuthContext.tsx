@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
 
   async function checkAdmin() {
-    const { data, error } = await withTimeout(supabase.rpc('check_is_admin'), 5000, 'check_is_admin')
+    const { data, error } = await withTimeout(supabase.rpc('check_is_admin'), 1000, 'check_is_admin')
     if (error) throw error
     setIsAdmin(data === true)
   }
@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     async function bootstrap() {
       try {
-        const { data } = await withTimeout(supabase.auth.getSession(), 5000, 'getSession')
+        const { data } = await withTimeout(supabase.auth.getSession(), 1000, 'getSession')
         if (cancelled) return
         const u = data.session?.user ?? null
         setUser(u)
