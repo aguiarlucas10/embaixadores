@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase } from '@shared/services/supabase'
+import { supabase, fetchAll } from '@shared/services/supabase'
 import { NS } from '@shared/services/nuvemshopApi'
 import { approveWithdrawal, rejectWithdrawal, markWithdrawalPaid } from '@shared/services/withdrawal'
 import { uploadPaymentProof } from '@shared/services/storage'
@@ -273,10 +273,18 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     const ate = ateISO + 'T23:59:59-03:00'
     const msRange = new Date(ateISO).getTime() - new Date(desdeISO).getTime()
     const diasRange = Math.round(msRange / 86400000) + 1
-    const { data: coms } = await supabase.from('comissoes').select('embaixador_id,valor_pedido,valor_comissao,status,payment_status,criado_em').gte('criado_em', desde).lte('criado_em', ate).order('criado_em', { ascending: true })
-    const { data: todosEmbs } = await supabase.from('embaixadores').select('id,nome,status,criado_em')
-    const { data: resgAll } = await supabase.from('resgates').select('valor,status,criado_em').order('criado_em', { ascending: true })
-    const { data: views } = await supabase.from('page_views').select('criado_em,dispositivo,sistema_operacional,navegador,utm_source,utm_medium,utm_campaign,etapa_saida,tempo_segundos').gte('criado_em', desde).lte('criado_em', ate)
+    const coms = await fetchAll<{ embaixador_id: string | null; valor_pedido: number | null; valor_comissao: number | null; status: string | null; payment_status: string | null; criado_em: string }>(
+      (from, to) => supabase.from('comissoes').select('embaixador_id,valor_pedido,valor_comissao,status,payment_status,criado_em').gte('criado_em', desde).lte('criado_em', ate).order('criado_em', { ascending: true }).range(from, to)
+    )
+    const todosEmbs = await fetchAll<{ id: string; nome: string; status: string; criado_em: string }>(
+      (from, to) => supabase.from('embaixadores').select('id,nome,status,criado_em').range(from, to)
+    )
+    const resgAll = await fetchAll<{ valor: number | null; status: string | null; criado_em: string }>(
+      (from, to) => supabase.from('resgates').select('valor,status,criado_em').order('criado_em', { ascending: true }).range(from, to)
+    )
+    const views = await fetchAll<{ criado_em: string; dispositivo: string | null; sistema_operacional: string | null; navegador: string | null; utm_source: string | null; utm_medium: string | null; utm_campaign: string | null; etapa_saida: string | null; tempo_segundos: number | null }>(
+      (from, to) => supabase.from('page_views').select('criado_em,dispositivo,sistema_operacional,navegador,utm_source,utm_medium,utm_campaign,etapa_saida,tempo_segundos').gte('criado_em', desde).lte('criado_em', ate).range(from, to)
+    )
     const fatDiario: Record<string, { faturamento: number; comissao: number }> = {}
     const cadDiario: Record<string, { cadastros: number; visitas: number }> = {}
     for (let d = 0; d < diasRange; d++) {
@@ -285,9 +293,11 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       fatDiario[key] = { faturamento: 0, comissao: 0 }
       cadDiario[key] = { cadastros: 0, visitas: 0 }
     }
-    ;(coms ?? []).forEach((c) => { const k = toBRDate(c.criado_em); if (fatDiario[k]) { fatDiario[k].faturamento += c.valor_pedido ?? 0; fatDiario[k].comissao += c.valor_comissao ?? 0 } })
-    ;(todosEmbs ?? []).filter((e) => e.criado_em >= desde).forEach((e) => { const k = toBRDate(e.criado_em); if (cadDiario[k]) cadDiario[k].cadastros += 1 })
-    ;(views ?? []).forEach((v) => { const k = toBRDate(v.criado_em); if (cadDiario[k]) cadDiario[k].visitas += 1 })
+    // Vendas válidas = todas exceto canceladas/reembolsadas (inclui pendentes)
+    const validas = coms.filter((c) => c.payment_status !== 'voided' && c.payment_status !== 'refunded' && c.payment_status !== 'cancelled')
+    validas.forEach((c) => { const k = toBRDate(c.criado_em); if (fatDiario[k]) { fatDiario[k].faturamento += c.valor_pedido ?? 0; fatDiario[k].comissao += c.valor_comissao ?? 0 } })
+    todosEmbs.filter((e) => e.criado_em >= desde).forEach((e) => { const k = toBRDate(e.criado_em); if (cadDiario[k]) cadDiario[k].cadastros += 1 })
+    views.forEach((v) => { const k = toBRDate(v.criado_em); if (cadDiario[k]) cadDiario[k].visitas += 1 })
     const timeline = Object.keys(fatDiario).sort().map((k) => ({
       data: keyToLabel(k), dataISO: k,
       fat: Math.round(fatDiario[k].faturamento * 100) / 100,
@@ -295,15 +305,14 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       cadastros: cadDiario[k]?.cadastros ?? 0,
       visitas: cadDiario[k]?.visitas ?? 0,
     }))
-    const pagos = (coms ?? []).filter((c) => c.payment_status === 'paid' || c.status === 'confirmada')
-    const totalFat = pagos.reduce((s, c) => s + (c.valor_pedido ?? 0), 0)
-    const totalCom = pagos.reduce((s, c) => s + (c.valor_comissao ?? 0), 0)
-    const totalPed = pagos.length
+    const totalFat = validas.reduce((s, c) => s + (c.valor_pedido ?? 0), 0)
+    const totalCom = validas.reduce((s, c) => s + (c.valor_comissao ?? 0), 0)
+    const totalPed = validas.length
     const ticketMedio = totalPed > 0 ? totalFat / totalPed : 0
-    const ativas = (todosEmbs ?? []).filter((e) => e.status === 'ativo').length
-    const comVenda = new Set(pagos.map((c) => c.embaixador_id).filter(Boolean)).size
-    const visitasTotal = (views ?? []).length
-    const cadPeriodo = (todosEmbs ?? []).filter((e) => toBRDate(e.criado_em) >= desdeISO && toBRDate(e.criado_em) <= ateISO).length
+    const ativas = todosEmbs.filter((e) => e.status === 'ativo').length
+    const comVenda = new Set(validas.map((c) => c.embaixador_id).filter(Boolean)).size
+    const visitasTotal = views.length
+    const cadPeriodo = todosEmbs.filter((e) => toBRDate(e.criado_em) >= desdeISO && toBRDate(e.criado_em) <= ateISO).length
     const txConversao = visitasTotal > 0 ? Math.round((cadPeriodo / visitasTotal) * 100) : 0
     const funil = [
       { etapa: 'Visitas', valor: visitasTotal, pct: 100 },
@@ -311,7 +320,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       { etapa: '1ª venda', valor: comVenda, pct: cadPeriodo > 0 ? Math.round((comVenda / cadPeriodo) * 100) : 0 },
     ]
     const rankMap: Record<string, { id: string; fat: number; peds: number; com: number }> = {}
-    pagos.forEach((c) => {
+    validas.forEach((c) => {
       if (!c.embaixador_id) return
       if (!rankMap[c.embaixador_id]) rankMap[c.embaixador_id] = { id: c.embaixador_id, fat: 0, peds: 0, com: 0 }
       rankMap[c.embaixador_id].fat += c.valor_pedido ?? 0
@@ -319,10 +328,10 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       rankMap[c.embaixador_id].com += c.valor_comissao ?? 0
     })
     const embMap: Record<string, string> = {}
-    ;(todosEmbs ?? []).forEach((e) => { embMap[e.id] = e.nome })
+    todosEmbs.forEach((e) => { embMap[e.id] = e.nome })
     const top10 = Object.values(rankMap).sort((a, b) => b.fat - a.fat).slice(0, 10).map((r) => ({ ...r, nome: (embMap[r.id] ?? '?').split(' ').slice(0, 2).join(' ') }))
     const resgMap: Record<string, { mes: string; valor: number; qtd: number }> = {}
-    ;(resgAll ?? []).forEach((r) => {
+    resgAll.forEach((r) => {
       const k = toBRDate(r.criado_em).slice(0, 7)
       if (!resgMap[k]) resgMap[k] = { mes: keyToMonthLabel(k + '-01'), valor: 0, qtd: 0 }
       resgMap[k].valor += r.valor ?? 0; resgMap[k].qtd += 1
@@ -333,7 +342,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       arr.forEach((v) => { const k = String(v[campo] ?? 'desconhecido'); m[k] = (m[k] ?? 0) + 1 })
       return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([label, qtd]) => ({ label, qtd }))
     }
-    const viewsArr = (views ?? []) as Record<string, unknown>[]
+    const viewsArr = views as unknown as Record<string, unknown>[]
     const etapaSaida = { form: 0, cupom: 0, sucesso: 0, outros: 0 }
     viewsArr.forEach((v) => {
       const e = v['etapa_saida']
