@@ -54,13 +54,10 @@ supabase functions deploy request-withdrawal
 supabase functions deploy approve-withdrawal
 supabase functions deploy mark-withdrawal-paid
 supabase functions deploy reject-withdrawal
+supabase functions deploy storage-upload
 ```
 
-A função `bright-api` antiga **continua existindo** (não foi deletada), mas não é mais usada pelas páginas novas. Pode ser removida quando confirmarmos que nada chama ela:
-
-```bash
-supabase functions delete bright-api  # apenas após validação
-```
+A função `bright-api` antiga continua **ACTIVE** no projeto e ainda é chamada diretamente por `WhatsAppTab.tsx` (templates/envio de WhatsApp) e `ChatTab.tsx` (chat) — **não deletar**. Só o upload de banner (`storageProxy.ts`) foi migrado para `storage-upload`; o erro de CORS/404 do banner era especificamente a action `storage_upload` que não existe mais (ou está quebrada) dentro do `bright-api` atual, não a função como um todo.
 
 ## 4) Configurar `pg_cron` para os jobs recorrentes
 

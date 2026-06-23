@@ -1,15 +1,9 @@
 /**
- * Upload de arquivos via Edge Function (bright-api) como proxy.
- * Necessário porque a publishable key não suporta Storage API diretamente.
- *
- * A Edge Function recebe o arquivo em base64 e faz o upload usando service_role.
+ * Upload de banners via Edge Function `storage-upload` (service_role).
+ * Necessário porque os buckets 'assets'/'banners' não têm policy de INSERT
+ * via RLS para o publishable key.
  */
-
-const proxy = `${import.meta.env['VITE_SUPABASE_URL']}/functions/v1/bright-api`
-const headers = {
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${import.meta.env['VITE_SUPABASE_ANON_KEY']}`,
-}
+import { supabase } from './supabase'
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -31,23 +25,20 @@ export async function uploadBanner(
 ): Promise<{ url: string } | { error: string }> {
   try {
     const base64 = await fileToBase64(file)
-    const res = await fetch(proxy, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        action: 'storage_upload',
-        bucket,
-        path,
-        base64,
-        contentType: file.type,
-      }),
+    const { data, error } = await supabase.functions.invoke('storage-upload', {
+      body: { bucket, path, base64, contentType: file.type },
     })
-    const data = await res.json()
-    if (data.error) return { error: data.error.message ?? JSON.stringify(data.error) }
-    if (data.url) return { url: data.url }
-    // Se a Edge Function retornar o path, montar a URL pública
-    const publicUrl = `${import.meta.env['VITE_SUPABASE_URL']}/storage/v1/object/public/${bucket}/${path}`
-    return { url: publicUrl }
+    if (error) {
+      const ctx = (error as { context?: { body?: string } }).context
+      let parsed: { error?: string; message?: string } | null = null
+      if (typeof ctx?.body === 'string') {
+        try { parsed = JSON.parse(ctx.body) } catch { /* ignore */ }
+      }
+      return { error: parsed?.message ?? parsed?.error ?? error.message }
+    }
+    const d = data as { ok?: boolean; url?: string; message?: string; error?: string }
+    if (!d.ok || !d.url) return { error: d.message ?? d.error ?? 'Erro desconhecido no upload' }
+    return { url: d.url }
   } catch (e) {
     return { error: 'Erro no upload: ' + String(e) }
   }

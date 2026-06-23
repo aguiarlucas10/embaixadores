@@ -37,51 +37,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
-    async function bootstrap() {
-      try {
-        const { data } = await withTimeout(supabase.auth.getSession(), 5000, 'getSession')
-        if (cancelled) return
-        const u = data.session?.user ?? null
-        setUser(u)
-        if (u) {
-          try {
-            await checkAdmin()
-          } catch (rpcErr) {
-            // RPC falhou (timeout, rede, função indisponível, etc.) —
-            // mantém a sessão e assume não-admin. NÃO desloga o usuário.
-            console.warn('[Auth] check_is_admin falhou, assumindo não-admin:', rpcErr)
-            if (!cancelled) setIsAdmin(false)
-          }
-        }
-      } catch (e) {
-        // Falha em getSession (storage corrompido, etc.) — segue como
-        // deslogado. signOut local apenas, sem invalidar no servidor.
-        console.error('[Auth] getSession falhou:', e)
-        if (!cancelled) {
-          setUser(null)
-          setIsAdmin(false)
-        }
-      } finally {
-        if (!cancelled) setChecking(false)
-      }
-    }
-    void bootstrap()
+    let resolved = false
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_, session) => {
+    // Rede de segurança: se nenhum evento de auth chegar (storage
+    // corrompido, lock do navegador travado, etc.), destrava o spinner sem
+    // tocar no estado de login — se o evento real chegar depois, ele corrige.
+    const fallback = setTimeout(() => {
+      if (!cancelled && !resolved) setChecking(false)
+    }, 12000)
+
+    // onAuthStateChange é a ÚNICA fonte de verdade do estado de auth: emite
+    // INITIAL_SESSION uma vez no boot e depois SIGNED_IN/SIGNED_OUT/etc.
+    // Não chamar getSession() manualmente em paralelo aqui é proposital —
+    // isso causava um bug onde um getSession() lento (disputando o lock
+    // interno do supabase-js com a própria inicialização) resolvia DEPOIS do
+    // SIGNED_IN e deslogava um usuário que já estava autenticado.
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (cancelled) return
+      resolved = true
+      clearTimeout(fallback)
       const u = session?.user ?? null
       setUser(u)
       if (u) {
         try {
           await checkAdmin()
-        } catch {
-          setIsAdmin(false)
+        } catch (rpcErr) {
+          // RPC falhou (timeout, rede, função indisponível, etc.) —
+          // mantém a sessão e assume não-admin. NÃO desloga o usuário.
+          console.warn('[Auth] check_is_admin falhou, assumindo não-admin:', rpcErr)
+          if (!cancelled) setIsAdmin(false)
         }
       } else {
         setIsAdmin(false)
       }
+      if (!cancelled) setChecking(false)
     })
 
-    return () => { cancelled = true; listener.subscription.unsubscribe() }
+    return () => { cancelled = true; clearTimeout(fallback); listener.subscription.unsubscribe() }
   }, [])
 
   const logout = useCallback(async () => {
