@@ -30,9 +30,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
 
   async function checkAdmin() {
-    const { data, error } = await withTimeout(supabase.rpc('check_is_admin'), 8000, 'check_is_admin')
-    if (error) throw error
-    setIsAdmin(data === true)
+    // Uma tentativa extra: se um erro transitório (lock, rede) escapar, um
+    // retry evita rebaixar o admin a não-admin e mandá-lo pra tela errada.
+    let lastErr: unknown
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { data, error } = await withTimeout(supabase.rpc('check_is_admin'), 8000, 'check_is_admin')
+        if (error) throw error
+        setIsAdmin(data === true)
+        return
+      } catch (e) {
+        lastErr = e
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 300))
+      }
+    }
+    throw lastErr
   }
 
   useEffect(() => {

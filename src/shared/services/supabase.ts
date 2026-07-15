@@ -1,4 +1,4 @@
-import { createClient, type PostgrestSingleResponse } from '@supabase/supabase-js'
+import { createClient, processLock, type PostgrestSingleResponse } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env['VITE_SUPABASE_URL'] as string
 const supabaseAnonKey = import.meta.env['VITE_SUPABASE_ANON_KEY'] as string
@@ -10,7 +10,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Usa o lock em memória (fila) em vez do navigator.locks. O lock padrão do
+// navegador podia ser "roubado" entre chamadas concorrentes do token de auth
+// (erro: Lock ... was released because another request stole it), o que fazia
+// o check_is_admin rejeitar e o admin cair na tela de embaixadora.
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { lock: processLock },
+})
 
 // Supabase devolve no máximo 1000 linhas por request — pagina até esgotar.
 export async function fetchAll<T>(
