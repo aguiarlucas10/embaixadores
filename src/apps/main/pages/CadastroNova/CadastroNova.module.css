@@ -1,0 +1,380 @@
+.page {
+  min-height: 100vh;
+  background: #fff;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+
+.header {
+  padding: 0 32px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #eee;
+}
+
+.brand {
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #000;
+}
+
+.headerLogin {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: transparent;
+  color: #707070;
+  border: none;
+  cursor: pointer;
+}
+
+/* ─── Hero (split-screen) ────────────────────────────────────────────────── */
+
+.heroLeft {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.heroTag {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #707070;
+  margin-bottom: 28px;
+}
+
+.heroHeadline {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(34px, 4vw, 50px);
+  font-weight: 300;
+  color: #000;
+  line-height: 1.1;
+  margin-bottom: 40px;
+}
+
+.heroHeadline em {
+  font-style: italic;
+}
+
+.heroBenefitList {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.heroBenefitItem {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.heroBenefitNum {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  color: #c8b89a;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.heroBenefitTitle {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: #000;
+  margin-bottom: 4px;
+}
+
+.heroBenefitDesc {
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #707070;
+  line-height: 1.7;
+}
+
+.heroRight {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.formEyebrow {
+  font-family: 'Questrial', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #707070;
+  margin-bottom: 16px;
+}
+
+.formIntro {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  color: #404040;
+  line-height: 1.7;
+  background: #f9f6f2;
+  border-left: 2px solid #000;
+  padding: 14px 18px;
+  margin-bottom: 32px;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.formCheckbox {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 28px;
+}
+
+.checkbox {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: #000;
+}
+
+.checkboxLabel {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #707070;
+  line-height: 1.7;
+  cursor: pointer;
+}
+
+.alertWrap {
+  margin-bottom: 24px;
+}
+
+.footerNote {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  color: #a0a0a0;
+  margin-top: 20px;
+  text-align: center;
+}
+
+/* ─── "Convencimento" (below the fold) ───────────────────────────────────── */
+
+.sectionInner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Nomeadas "condensed*" (em vez de section*) para não colidir na leitura com as
+   classes de mesmo radical importadas de Cadastro.module.css (sharedStyles) nas
+   seções reaproveitadas verbatim (marquee/FAQ/regras/rodapé). */
+.condensedTag {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a0a0a0;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.condensedTitle {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 400;
+  text-align: center;
+  line-height: 1.1;
+  margin-bottom: 40px;
+}
+
+.condensedTitle em {
+  font-style: italic;
+}
+
+/* Como funciona — tira condensada */
+.howSection {
+  background: #f9f6f2;
+  padding: 56px 24px;
+}
+
+.stepsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.stepItem {
+  background: #fff;
+  padding: 20px 18px;
+}
+
+.stepNum {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 30px;
+  font-weight: 300;
+  color: #e8e0d8;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+
+.stepTitle {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.stepDesc {
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #707070;
+  line-height: 1.7;
+}
+
+/* Benefícios — grade condensada */
+.benefitsSection {
+  background: #fff;
+  padding: 56px 24px;
+}
+
+.benefitsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 4px 24px;
+}
+
+.benefitCard {
+  padding: 18px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.benefitTitle {
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  color: #000;
+  margin-bottom: 4px;
+}
+
+.benefitDesc {
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #707070;
+  line-height: 1.6;
+}
+
+/* Vídeo — conteúdo opcional, não gate */
+.videoSection {
+  background: #f9f6f2;
+  padding: 56px 24px;
+}
+
+.videoInner {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.videoTeaser {
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  color: #707070;
+  margin-bottom: 20px;
+}
+
+.videoEmbed {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
+}
+
+.videoIframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* CTA de volta ao formulário, no fim das seções de convencimento */
+.backToFormWrap {
+  text-align: center;
+  padding: 48px 24px;
+  background: #000;
+}
+
+.backToFormTitle {
+  font-family: 'Questrial', sans-serif;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 300;
+  color: #fff;
+  margin-bottom: 24px;
+}
+
+.backToFormBtn {
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  background: #fff;
+  color: #000;
+  border: none;
+  padding: 16px 36px;
+  cursor: pointer;
+}
+
+/* ─── Sticky mobile CTA ───────────────────────────────────────────────────── */
+
+.stickyCta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 300;
+  background: #000;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.stickyCtaBtn {
+  font-family: 'Questrial', sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+}
+
+@media (min-width: 769px) {
+  .stickyCta {
+    display: none;
+  }
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .header {
+    padding: 0 20px;
+  }
+}

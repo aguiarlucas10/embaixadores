@@ -3,6 +3,7 @@ import { useAuth } from '@shared/hooks/useAuth'
 import { supabase } from '@shared/services/supabase'
 import { Spinner } from '@shared/components/atoms/Spinner/Spinner'
 import { PageCadastro } from './pages/Cadastro/Cadastro'
+import { PageCadastroNova } from './pages/CadastroNova/CadastroNova'
 import { LoginPage } from './pages/Login/Login'
 import { PainelPage } from './pages/Painel/Painel'
 import { AdminPage } from './pages/Admin/Admin'
@@ -41,6 +42,12 @@ export function MainApp() {
       <Route path="/" element={
         <LoginRoute>
           <PageCadastro />
+        </LoginRoute>
+      } />
+
+      <Route path="/nova" element={
+        <LoginRoute>
+          <PageCadastroNova />
         </LoginRoute>
       } />
 
