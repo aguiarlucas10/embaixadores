@@ -15,8 +15,6 @@ import { BtnPrimary, BtnSecondary, BtnGhost } from '@shared/components/atoms/But
 import { Input } from '@shared/components/atoms/Input/Input'
 import { BarChartSVG } from '@shared/components/charts/BarChartSVG/BarChartSVG'
 import { ComboChartSVG } from '@shared/components/charts/ComboChartSVG/ComboChartSVG'
-import { ChatTab } from './tabs/Chat/ChatTab'
-import { WhatsAppTab } from './tabs/WhatsApp/WhatsAppTab'
 import styles from './Admin.module.css'
 
 const COMISSAO_PCT = Number(import.meta.env['VITE_COMISSAO_PCT'] ?? 0.1)
@@ -80,7 +78,6 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [busca, setBusca] = useState('')
   const [ordemEmb, setOrdemEmb] = useState('data')
   const [editEmb, setEditEmb] = useState<EmbComissoes | null>(null)
-  const [unread, setUnread] = useState(0)
   const [editForm, setEditForm] = useState<Partial<Embaixador>>({})
   const [savingEdit, setSavingEdit] = useState(false)
   const [msgEdit, setMsgEdit] = useState<Msg>({ text: '', ok: false })
@@ -122,17 +119,6 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     if (dashModo === 'preset') loadDashboard(dashPeriodo, null, null)
     else if (dashCustomDe && dashCustomAte) loadDashboard(null, dashCustomDe, dashCustomAte)
   }, [dashPeriodo, dashModo, dashCustomDe, dashCustomAte]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Realtime unread messages badge
-  useEffect(() => {
-    supabase.from('mensagens_whatsapp').select('id', { count: 'exact' }).eq('lida', false).eq('de_nos', false)
-      .then(({ count }) => setUnread(count ?? 0))
-    const ch = supabase.channel('unread').on('postgres_changes', { event: '*', schema: 'public', table: 'mensagens_whatsapp' }, () => {
-      supabase.from('mensagens_whatsapp').select('id', { count: 'exact' }).eq('lida', false).eq('de_nos', false)
-        .then(({ count }) => setUnread(count ?? 0))
-    }).subscribe()
-    return () => { void supabase.removeChannel(ch) }
-  }, [])
 
   async function loadEmbs(page: number, search: string) {
     setEmbLoading(true)
@@ -484,7 +470,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
 
   if (loading) return <div className={styles.page}><Header user={user} onLogout={onLogout} isAdmin /><Spinner /></div>
 
-  const tabLabels = { dashboard: 'Dashboard', embaixadores: `Embaixadores (${embTotal})`, resgates: ress.length > 0 ? `Resgates (${ress.length})` : 'Resgates', fila: `Fila (${fila.length})`, financeiro: 'Financeiro', banner: 'Banner', whatsapp: unread > 0 ? `WhatsApp (${unread})` : 'WhatsApp', chat: unread > 0 ? `Chat (${unread})` : 'Chat', importar: 'Importar', 'pré-estreia': 'Pré-estreia' }
+  const tabLabels = { dashboard: 'Dashboard', embaixadores: `Embaixadores (${embTotal})`, resgates: ress.length > 0 ? `Resgates (${ress.length})` : 'Resgates', fila: `Fila (${fila.length})`, financeiro: 'Financeiro', banner: 'Banner' }
 
   return (
     <div className={styles.page}>
@@ -505,7 +491,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
         </div>
 
         <Tabs
-          tabs={['dashboard', 'embaixadores', 'resgates', 'fila', 'financeiro', 'banner', 'whatsapp', 'chat', 'importar', 'pré-estreia']}
+          tabs={['dashboard', 'embaixadores', 'resgates', 'fila', 'financeiro', 'banner']}
           labels={tabLabels}
           active={tab}
           onChange={setTab}
@@ -877,26 +863,6 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
           )}
 
           {/* ─── IMPORTAR ─── */}
-          {tab === 'importar' && (
-            <div className="fade-in">
-              <p className={styles.sectionTitle}>Importar embaixadores</p>
-              <p className={styles.empty}>Funcionalidade disponível no arquivo legado. Em desenvolvimento na nova versão.</p>
-            </div>
-          )}
-
-          {/* ─── PRÉ-ESTREIA ─── */}
-          {tab === 'pré-estreia' && (
-            <div className="fade-in">
-              <p className={styles.sectionTitle}>Lista pré-estreia</p>
-              <p className={styles.empty}>Funcionalidade disponível no arquivo legado. Em desenvolvimento na nova versão.</p>
-            </div>
-          )}
-
-          {/* ─── WHATSAPP ─── */}
-          {tab === 'whatsapp' && <WhatsAppTab embs={embs} />}
-
-          {/* ─── CHAT ─── */}
-          {tab === 'chat' && <ChatTab embs={embs} onUnread={setUnread} />}
         </Tabs>
       </div>
     </div>
