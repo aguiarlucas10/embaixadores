@@ -66,9 +66,9 @@ Deno.serve(async (req) => {
       const emb = cupomToEmb.get(code.toUpperCase())
       if (!emb) { skipped++; continue }
 
-      const subtotal = computeCommissionableSubtotal(o)
+      const total = Number(o.total)
       const pct = emb.comissao_pct ?? 0.10
-      const valor_comissao = Math.round(subtotal * pct * 100) / 100
+      const valor_comissao = Math.round(total * pct * 100) / 100
 
       const dataPedido = o.created_at
       const returnEnds = new Date(new Date(dataPedido).getTime() + RETURN_DAYS * 86400 * 1000).toISOString()
@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
       const { error } = await supa.from('comissoes').upsert({
         embaixador_id: emb.id,
         pedido_id: String(o.id),
-        valor_pedido: Number(o.total),
+        valor_pedido: total,
         valor_comissao,
         status: 'pendente',
         payment_status: o.payment_status,
@@ -119,12 +119,4 @@ function extractCouponCode(order: NSOrder): string | null {
     return String(order.promotional_discount.code)
   }
   return null
-}
-
-function computeCommissionableSubtotal(order: NSOrder): number {
-  const total = Number(order.total ?? 0)
-  const shipping = Number(order.shipping_cost_customer ?? 0)
-  const sub = Number(order.subtotal ?? NaN)
-  if (!isNaN(sub) && sub > 0) return sub
-  return Math.max(0, total - shipping)
 }

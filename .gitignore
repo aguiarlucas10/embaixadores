@@ -38,3 +38,8 @@ Thumbs.db
 *.log
 npm-debug.log*
 supabase/.temp/
+
+# Exports com dados pessoais de clientes (PII) — nunca commitar
+*.csv
+*.xlsx
+supabase/imports/
