@@ -91,6 +91,7 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
     const { data: e } = await supabase.from('embaixadores').select('*').eq('email', user.email!).single()
     if (!e) { setLoading(false); return }
     setEmb(e)
+    setFResgate((p) => ({ ...p, pix_key: p.pix_key || (e.pix_key ?? '') }))
     setPerfil({
       nome: e.nome ?? '', whatsapp: e.whatsapp ?? '', instagram: e.instagram ?? '', tiktok: e.tiktok ?? '',
       pix_key: e.pix_key ?? '', cep: '', endereco: '', numero: '', complemento: '', cidade: '', estado: '',
@@ -118,7 +119,7 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
       return
     }
     const pix = fResgate.pix_key.trim() || emb?.pix_key || ''
-    if (!pix) { setMsgR({ text: 'Cadastre sua chave Pix na aba Perfil antes de solicitar o resgate.', ok: false }); return }
+    if (!pix) { setMsgR({ text: 'Informe sua chave Pix para receber o pagamento.', ok: false }); return }
 
     setResgatando(true)
     const result = await requestWithdrawal({
@@ -329,26 +330,19 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
                 </p>
               </div>
 
-              {!emb.pix_key && (
-                <div className={styles.alertWrap}>
-                  <Alert msg="Cadastre sua chave Pix na aba Perfil para habilitar o resgate." />
-                  <button className={styles.irParaPerfil} onClick={() => setTab('perfil')}>Ir para Perfil →</button>
-                </div>
-              )}
-
-              {emb.pix_key && saldoDisp > 0 && saldoDisp < 100 && (
+              {saldoDisp > 0 && saldoDisp < 100 && (
                 <div className={styles.alertWrap}>
                   <Alert msg={`Saldo atual de ${brl(saldoDisp)} ainda não atingiu o mínimo de R$ 100,00. Continue acumulando!`} />
                 </div>
               )}
 
-              {emb.pix_key && saldoDisp >= 100 && !isWithdrawalWindow() && (
+              {saldoDisp >= 100 && !isWithdrawalWindow() && (
                 <div className={styles.alertWrap}>
                   <Alert msg={`O prazo de solicitação (até dia 10) encerrou para este mês. Seu saldo de ${brl(saldoDisp)} será acumulado para o próximo ciclo.`} />
                 </div>
               )}
 
-              {emb.pix_key && saldoDisp >= 100 && isWithdrawalWindow() && (
+              {saldoDisp >= 100 && isWithdrawalWindow() && (
                 <div className={styles.resgateForm}>
                   <p className={styles.resgateFormLabel}>Tipo da chave PIX</p>
                   <div className={styles.tipoBtns}>
@@ -356,16 +350,21 @@ export function PainelPage({ user, onLogout }: PainelPageProps) {
                       <button
                         key={val}
                         className={`${styles.tipoBtn} ${fResgate.pix_key_type === val ? styles.tipoBtnActive : ''}`}
-                        style={{ borderRight: i < arr.length - 1 ? '1px solid #000' : 'none' }}
+                        style={{ borderRight: i < arr.length - 1 ? '1px solid var(--ink)' : 'none' }}
                         onClick={() => setFResgate((p) => ({ ...p, pix_key_type: val }))}
                       >
                         {lbl}
                       </button>
                     ))}
                   </div>
-                  <div className={styles.pixInfo}>
-                    <p>Chave PIX cadastrada: <strong>{emb.pix_key}</strong></p>
-                    <button className={styles.alterarPix} onClick={() => setTab('perfil')}>Alterar no Perfil</button>
+                  <div className={styles.pixField}>
+                    <Input
+                      label="Chave Pix"
+                      value={fResgate.pix_key}
+                      onChange={(e) => setFResgate((p) => ({ ...p, pix_key: e.target.value }))}
+                      placeholder="CPF, e-mail, telefone ou chave aleatória"
+                    />
+                    <p className={styles.pixNote}>O pagamento vai para esta chave. Ela fica salva no seu perfil.</p>
                   </div>
                   <div className={styles.valorResgate}>
                     <p>Valor a resgatar: <strong className={styles.valorDestaque}>{brl(saldoDisp)}</strong></p>

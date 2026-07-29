@@ -1,3 +1,15 @@
+/* Design tokens (ver DESIGN.md) */
+:root {
+  --paper: #fdfcfa;
+  --ink: #1c1915;
+  --ink-soft: #6f6a62;
+  --ink-faint: #a39d94;
+  --wash: #f6f3ee;
+  --line: #e8e4de;
+  --ok: #2f7a4d;
+  --err: #b3352e;
+}
+
 /* Reset & base */
 *,
 *::before,
@@ -9,14 +21,23 @@
 
 body {
   font-family: 'Questrial', sans-serif;
-  background: #fff;
-  color: #000;
+  background: var(--paper);
+  color: var(--ink);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
 input[type='checkbox'] {
-  accent-color: #000;
+  accent-color: var(--ink);
 }
 
 input[type='date']::-webkit-calendar-picker-indicator {

@@ -2,6 +2,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #f5f5f5;
-  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+  gap: 16px;
+}
+
+.row:last-child {
+  border-bottom: none;
 }
